@@ -10,7 +10,7 @@ Labs are organized by topic, using only a short identifier
 
 ### Monday
 
-* ...
+* [Intro to R and Bioconductor](intro-to-r-bioc) - `intro-to-r-bioc`
 
 ### Tuesday
 
