@@ -10,6 +10,12 @@ bibliography: biblio.bib
 output: BiocStyle::html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = FALSE, error = FALSE, message = FALSE,
+                      warning = FALSE, echo = TRUE, results = "markup",
+                      fig.align = "center", collapse = TRUE)
+```
+
 # Introduction
 
 In this tutorial we walk through a typical spatial transcriptomics analysis using Bioconductor packages.
@@ -209,6 +215,7 @@ These results already offer a way to explore potentially interesting spatial sig
 ```{r plot-genes}
 plotSpots(spe, annotate = "ENSG00000197971")
 ```
+
 # Dimensionality reduction
 
 We now apply principal component analysis (PCA) to reduce the dimensionality of the dataset, and retain the top 50 principal components (PCs) for further downstream analyses.
