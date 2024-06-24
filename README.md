@@ -10,12 +10,12 @@ Labs are organized by topic, using only a short identifier
 
 ### Monday
 
-* [Intro to R and Bioconductor](intro-to-r-bioc) - `intro-to-r-bioc`
+* [Intro to R and Bioconductor](https://bioconductor.github.io/CSAMA-labs/intro-to-r-bioc/lab-1-intro-to-r-bioc.html) - `intro-to-r-bioc`
 
 ### Tuesday
 
-* [Bulk RNA-seq analysis](bulk-rnaseq/rnaseqGene_CSAMA2024.Rmd) - `bulk-rnaseq`
-* [Single cell RNA-seq analysis](single-cell-rnaseq/singlecell_CSAMA2024.Rmd) - `single-cell-rnaseq`
+* [Bulk RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/bulk-rnaseq/rnaseqGene_CSAMA2024.html) - `bulk-rnaseq`
+* [Single cell RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/single-cell-rnaseq/singlecell_CSAMA2024.html) - `single-cell-rnaseq`
 
 ### Thursday / Friday
 
