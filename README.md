@@ -15,6 +15,7 @@ Labs are organized by topic, using only a short identifier
 ### Tuesday
 
 * [Bulk RNA-seq analysis](bulk-rnaseq/rnaseqGene_CSAMA2024.Rmd) - `bulk-rnaseq`
+* [Single cell RNA-seq analysis](single-cell-rnaseq/singlecell_CSAMA2024.Rmd) - `single-cell-rnaseq`
 
 ### Thursday / Friday
 
