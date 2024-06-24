@@ -11,6 +11,7 @@ Labs are organized by topic, using only a short identifier
 ### Monday
 
 * [Intro to R and Bioconductor](https://bioconductor.github.io/CSAMA-labs/intro-to-r-bioc/lab-1-intro-to-r-bioc.html) - `intro-to-r-bioc`
+* [Intro to Quarto](https://bioconductor.github.io/CSAMA-labs/quarto-intro/quarto.html) - `quarto-intro`
 
 ### Tuesday
 
