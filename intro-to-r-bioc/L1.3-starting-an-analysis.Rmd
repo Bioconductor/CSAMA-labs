@@ -255,7 +255,7 @@ suppressPackageStartupMessages({
   in the vignette with the command
 
   ```{r, eval = FALSE}
-  source(vign, echo = TRUE, max.lines = Inf)
+  source(vign, echo = TRUE)
   ```
 
 **Exercise** Help pages provide more focused instructions for use of
