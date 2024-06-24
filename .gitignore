@@ -1,0 +1,7 @@
+*.txt
+*.rda
+*.RData
+*.rds
+*.gz
+*.zip
+*.knit.md
