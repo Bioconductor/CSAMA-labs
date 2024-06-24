@@ -1,0 +1,767 @@
+---
+title: "Reproducible publishing and literate programming with Quarto"
+author: "Charlotte Soneson"
+license: "Distributed under CC-BY license"
+date: "2024-06-24"
+date-format: long
+format: 
+    html:
+        embed-resources: true
+        callout-appearance: default
+        table-of-contents: true
+---
+
+# How (many) manuscripts are made
+
+![](images/typical-publication-workflow/typical-publication-workflow.001.png)
+
+The schematic above shows an (over-simplified, of course) illustration of the traditional process used to generate many scientific manuscripts. 
+In order to produce such a manuscript, we collect data, run various types of analyses, generate plots and schematics, carefully assemble them into the final figures for the paper, write the text and paste the analysis results and figures in the document, before submitting to a journal for consideration. 
+
+After some time, we receive the reviewer reports, often suggesting some changes or additions to the analysis. 
+At this point it's up to us to (1) make sure that we still remember how the original figures and results were generated, and (2) go through the whole process above again to create the updated figures and results.
+
+What we will talk about in this workshop is one way of structuring our work so that (1) it, arguably, becomes easier to get back into it after some time, (2) we know exactly how each original figure was created, and (3) the amount of _manual_ work required to revise the manuscript is reduced. 
+In addition, it has the advantage of automatically providing us with a reproducible record of the analysis, which can be shared for example as a supplementary file of the manuscript.
+
+# What is literate programming?
+
+The term '[literate programming](http://www.literateprogramming.com/)' was introduced by Donald Knuth in 1984, and refers to a programming paradigm where an explanation of the analysis process in natural language is interspersed with chunks of executable source code.
+This single source file is then used to create both machine executable code (effectively, extracting the code chunks) and a comprehensive human-readable report containing both the natural language text and the results of running the code. 
+A recent [publication](https://academic.oup.com/bib/article/24/6/bbad375/7326135) by Ziemann et al. considers literate programming one of the five pillars of reproducible computational research: 
+
+<center>
+![](images/reproducibility-pillars.jpeg)
+</center>
+
+According to the same article, there are several advantages of using literate programming, including: 
+
+- since the report contains both the code and the output, we know precisely which code was executed to generate a specific result (compare this to copy-pasting your figures from the RStudio viewer into a Word document), and the text and results are arranged in a logical and consistent way. Circumventing the copy-pasting of results into reports also saves time.
+- it makes it easy to provide extensive documentation and explanations of the code - in principle, we can write entire papers using literate programming!
+- it provides built-in checks that the given code _actually runs_ - if not, no output report is generated.
+
+# What is R Markdown?
+
+R Markdown lets you write dynamic, reproducible documents in R (actually, it can also contain code in other languages like python or bash!).
+An R Markdown document can contain regular text as well as code chunks, equations and images.
+The document can be rendered into many different output formats, such as html, pdf, Microsoft Word, websites, and slideshows (for the latter, check out [xaringan](https://slides.yihui.org/xaringan/#1)).
+
+# What is Quarto? 
+
+[Quarto](https://quarto.org) is an open-source publishing system built on markdown. 
+It is developed and maintained by Posit. 
+For R users, Quarto can be thought of as "next generation" R Markdown, combining what was previously spread across many packages (including `rmarkdown`, `bookdown`, and `xaringan`) into one system. 
+Quarto is fundamentally multi-lingual, and can for example be used to write python code without requiring R to be present (as mentioned, R Markdown can also contain python code, but R needs to be present in order to compile the report). 
+For a more detailed overview, see e.g. [the Quarto FAQ](https://quarto.org/docs/faq/rmarkdown.html#quarto-sounds-similar-to-r-markdown.-what-is-the-difference-and-why-create-a-new-project) or [this blog post](https://yihui.org/en/2022/04/quarto-r-markdown/). 
+In terms of the syntax, R Markdown and Quarto are very similar, and in many cases simply changing the file extension from `.Rmd` to `.qmd` or vice versa will give a valid file. 
+
+In this workshop, we will use Quarto, but most of the basics that we are going to cover works perfectly fine also with R Markdown. 
+Moreover, the main walkthrough will use R and [RStudio](https://posit.co/products/open-source/rstudio/), but pointers will be made to the corresponding steps in [Visual Studio Code](https://code.visualstudio.com/) (assuming that the latter is used for python projects).
+
+To install Quarto on your local computer, follow the instructions on [https://quarto.org/docs/get-started/](https://quarto.org/docs/get-started/). 
+If you are using Visual Studio Code, you also need to install the Quarto and Jupyter [extensions](https://code.visualstudio.com/docs/editor/extension-marketplace).
+
+# Setup instructions
+
+To prepare for the workshop, follow the instructions in the box below.
+
+::: {.callout-important title="Installation/setup instructions" collapse="true"}
+
+If you would like to follow along on your own computer during the workshop, 
+please install `Quarto` and prepare your setup following the instructions 
+below. For demonstrations, we will mostly be using RStudio. However, if you 
+prefer to work with Python and Visual Studio Code, that is also fine - we 
+provide parallel instructions for most parts of the workshop material. 
+
+For general instructions on how to install `Quarto`, see 
+[https://quarto.org/docs/get-started/](https://quarto.org/docs/get-started/).
+
+### R / RStudio setup
+
+Recent versions of RStudio comes with built-in support for `Quarto`. Thus, 
+we recommend installing a recent version of R (the current release version is 
+4.4) and RStudio, e.g. following the links and instructions available at 
+[https://posit.co/download/rstudio-desktop/](https://posit.co/download/rstudio-desktop/).
+
+In order to render documents into pdf format, `Quarto` needs to be able to 
+access LaTeX. You can use `Quarto` to install `TinyTeX` by following the 
+instructions at [https://quarto.org/docs/output-formats/pdf-basics.html](https://quarto.org/docs/output-formats/pdf-basics.html) - i.e., type 
+
+:::: {.callout-note appearance="minimal"}
+```
+quarto install tinytex
+```
+::::
+
+in the terminal (this can be done from the RStudio Terminal window).
+
+### Python / Visual Studio Code setup
+
+For instructions on how to get started with `Quarto` in VS Code, see 
+[https://quarto.org/docs/get-started/hello/vscode.html](https://quarto.org/docs/get-started/hello/vscode.html).
+
+First, make sure that Python is available. For example, use 
+[conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
+to create an environment (here named `quartoenv`) with the packages that we 
+will use in this workshop: 
+
+:::: {.callout-note appearance="minimal"}
+```
+conda create -n quartoenv -c conda-forge python=3.12 jupyter \
+matplotlib scikit-learn papermill session-info
+```
+::::
+
+Instructions on how to install VS Code can be found at
+[https://code.visualstudio.com/](https://code.visualstudio.com/).
+
+You will need to add a few extensions to VS Code (you can do this from 
+inside VS Code by clicking on the `Extensions` tab). The extensions we need 
+are `Python`, `Quarto`, and `Jupyter`. 
+
+Next, open the Command Palette by pressing `Ctrl` + `Shift` + `P` 
+(`Cmd` + `Shift` + `P` on macOS), and search for the command 
+`Python: Select Interpreter`. Click on it and select the interpreter 
+corresponding to the conda environment that you created above. 
+
+Finally, in order to render documents into pdf format, `Quarto` needs to be able to 
+access LaTeX. You can use `Quarto` to install `TinyTeX` by following the 
+instructions at [https://quarto.org/docs/output-formats/pdf-basics.html](https://quarto.org/docs/output-formats/pdf-basics.html) - i.e., type 
+
+:::: {.callout-note appearance="minimal"}
+```
+quarto install tinytex
+```
+::::
+
+in the terminal (this can be done from the VS Code Terminal panel).
+:::
+
+# Creating a .qmd file in RStudio
+
+To create a Quarto document (`.qmd` file) in RStudio, click on `New File`, and select `Quarto Document` (or, equivalently, go via the menu `File` -\> `New File` -\> `Quarto Document`).
+
+![](images/create-qmd.png)
+
+In the dialog that comes up, you can give the document a title and type your name into the `Author` field, and select the default output format (this can be changed later).
+Note that generating pdf or Word output requires additional software to be available on your system - for now, let's select HTML as the output format.
+
+![](images/name-qmd.png)
+
+Clicking "Create" opens the Quarto document in the RStudio IDE.
+Before we look at the content, save the document to disk, either by clicking on the 'Save' button or by going via `File` -> `Save` - here, we will use the name `qmd-example.qmd`. 
+
+::: {.callout-important title="Python/Visual Studio Code" collapse="true"}
+To create a new file in Visual Studio Code, go to the Explorer tab and click on `New File...`.
+
+![](images/vscode-newfile.png)
+
+Give the file a name (e.g. `qmd-example.qmd`). 
+Then paste the following content into the file (we will go through it below) and set the author name appropriately.
+
+````{verbatim}
+---
+title: "My first Quarto document"
+author: "Charlotte Soneson"
+format: html
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{python}
+1 + 1
+```
+
+You can add options to executable code like this 
+
+```{python}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+````
+:::
+
+# Rendering the document
+
+There are several ways to render the `.qmd` document to its final format. 
+In RStudio, one way is to click on the `Render` button above the document (or use the keyboard shortcut `Ctrl`+`Shift`+`K`, or `Cmd`+`Shift`+`K` on macOS): 
+
+![](images/qmd-render-button.png)
+
+Another option is to type the following in the R console (assuming that the `quarto` package is installed and that the `.qmd` file is saved as `qmd-example.qmd` in the current working directory): 
+
+```{r}
+#| eval: false
+
+quarto::quarto_render("qmd-example.qmd")
+```
+
+Either of these options will render the document in a new R session. 
+The figure below illustrates what happens 'under the hood' when a document is rendered:
+
+![](images/rstudio-qmd-how-it-works.png)
+Source: [https://quarto.org/docs/get-started/hello/rstudio.html](https://quarto.org/docs/get-started/hello/rstudio.html)
+
+More settings related to the rendering can be found by clicking on the little gear next to the Render button: 
+
+![](images/qmd-render-settings.png)
+
+::: {.callout-tip title="Rendering an R Markdown document"}
+To render an R Markdown document, you can click the `Knit` button in RStudio, or type 
+
+```{r}
+#| eval: false
+
+rmarkdown::render("rmd-example.rmd")
+```
+
+However, in this case there is an important difference between the two ways of rendering the document: clicking on the `Knit` button will render the document in a new R session, while `rmarkdown::render()` will by default execute the code in the document in the "parent environment" (the current active R session). 
+:::
+
+For now, let's click on the `Render` button to generate an HTML file from our `.qmd` document. 
+
+::: {.callout-important title="Python/Visual Studio Code" collapse="true"}
+To render the document in Visual Studio Code, first make sure that you have selected a suitable python interpreter (use `Ctrl` + `Shift` + `P`, or `Cmd` + `Shift` + `P` on macOS, to open the command palette, and then select a suitable python interpreter). 
+Then, the document can be rendered by clicking on the `Preview` button (left-most button in the top right corner): 
+
+![](images/vscode-preview-button.png)
+
+Alternatively, one can use the keyboard shortcut `Ctrl` + `Shift` + `K` (or `Cmd` + `Shift` + `K` on macOS).
+
+The rendering is done in a very similar way to what we showed for RStudio above, the main difference being that the Jupyter engine is used instead of knitr to extract and evaluate the code chunks. 
+
+![](images/qmd-how-it-works.png)
+
+Source: [https://quarto.org/docs/get-started/hello/vscode.html](https://quarto.org/docs/get-started/hello/vscode.html)
+:::
+
+# The YAML header
+
+Now that we've tried the process of generating the output file, let's take a look at the structure of the `.qmd` file.
+The first lines form the so called *YAML header* - this is where you specify what type of document you want to build from the `.qmd` file, and provide details about styles and themes.
+We can see that the template document generated by RStudio contains the information that we specified when creating the file.
+
+```{verbatim}
+---
+title: "My first Quarto document"
+author: "Charlotte Soneson"
+format: html
+---
+```
+
+If we want to change the output format, this can be done in the YAML header (i.e., there's no need to create a new document from scratch).
+For example, if we want a PDF file rather than an HTML file, we change the last line in the YAML header to:
+
+```{verbatim}
+format: pdf
+```
+
+We can configure many aspects of our document via the YAML fields. 
+The available fields depend to some extent on the selected format. 
+[This website](https://quarto.org/docs/reference/formats/html.html) lists the options available for HTML files. 
+
+In our example document, let's add a table of contents and change the theme. 
+You can find a list of available themes [here](https://www.datadreaming.org/post/r-markdown-theme-gallery/). 
+We will also add a line to make the HTML file _self-contained_ (`embed-resources: true`).
+Without this line, any external dependencies of the HTML file (images, style sheets, etc) will be placed in a separate folder, which must be distributed along with the HTML file for proper rendering. 
+A self-contained HTML file is larger, but can be shared or moved without external dependencies. 
+Our YAML header will now look something like this (note the indentation under `format` - this is important for correct parsing of the YAML): 
+
+```{verbatim}
+---
+title: "My first Quarto document"
+author: "Charlotte Soneson"
+format: 
+    html:
+        toc: true
+        theme: cosmo
+        embed-resources: true
+---
+```
+
+Try to render the document again and see the difference.
+If the options that we specify should apply across any output format that we may want to use, we can also define them on the top level, rather than under the specific format.
+For example, if we would like to be able to render the document also into PDF format, and we would like to have a table of content also in that case, but the `cosmo` theme should only be used for the html format, this could be specified as follows:
+
+```{verbatim}
+---
+title: "My first Quarto document"
+author: "Charlotte Soneson"
+toc: true
+format: 
+    html:
+        theme: cosmo
+        embed-resources: true
+    pdf: default
+---
+```
+
+If we add multiple possible formats as in the example above, we can choose the rendering format in the little dropdown menu that then appears next to the 'Render' button:
+
+![](images/qmd-render-multiple.png)
+
+By default, the format that is specified first in the YAML will be used. 
+
+::: {.callout-warning title="Exercise" icon=false}
+Add a date to the YAML header. 
+See [here](https://quarto.org/docs/reference/dates) for information about how to specify dates in Quarto.
+
+<details>
+<summary><b>
+Solution - fixed date
+</b></summary>
+```{verbatim}
+---
+title: "My first Quarto document"
+author: "Charlotte Soneson"
+date: "2024-06-11"
+date-format: "long"
+format: 
+    html:
+        toc: true
+        theme: cosmo
+        embed-resources: true
+---
+```
+</details>
+
+<details>
+<summary><b>
+Solution - using the date when the document is rendered (R code)
+</b></summary>
+```{verbatim}
+---
+title: "My first Quarto document"
+author: "Charlotte Soneson"
+date: "`r Sys.Date()`"
+date-format: "long"
+format: 
+    html:
+        toc: true
+        theme: cosmo
+        embed-resources: true
+---
+```
+</details>
+
+<details>
+<summary><b>
+Solution - using the date when the document is rendered (`today` quarto keyword, does not work in R Markdown)
+</b></summary>
+```{verbatim}
+---
+title: "My first Quarto document"
+author: "Charlotte Soneson"
+date: today
+date-format: "long"
+format: 
+    html:
+        toc: true
+        theme: cosmo
+        embed-resources: true
+---
+```
+</details>
+
+:::
+
+# The body of the document
+
+Below the YAML header, the rest of the `.qmd` document consists of a mix of regular text and code chunks.
+The text is formatted according to [`markdown` syntax](https://www.rstudio.com/wp-content/uploads/2015/03/rmarkdown-reference.pdf) (see also [this page](https://www.markdownguide.org/basic-syntax/)).
+For example, headers (of different levels) are generated by prepending (different numbers of) hash symbols (`#`) to the header text:
+
+```
+# Header 1
+## Header 2
+### Header 3
+```
+
+**Bold** __text__ is obtained by adding `__` or `**` to each side of the text, and _italic_ *text* is obtained by adding `_` or `*` to each side of the text. 
+
+Code chunks are generated with the following syntax:
+
+```{{r}}
+x <- 1 + 1
+```
+
+::: {.callout-tip title="Tip"}
+On a Swiss QWERTZ keyboard, the backtick can be found here:
+![](images/qwertz-backtick.png)
+Source: [https://superuser.com/questions/254076/how-do-i-type-the-tick-and-backtick-characters-on-windows](https://superuser.com/questions/254076/how-do-i-type-the-tick-and-backtick-characters-on-windows)
+:::
+
+The `{r}` part indicates that the chunk contains R code. 
+It is possible to use other engines (e.g., python or bash) by replacing the `r` in the chunk header (note that additional packages, as well as a functional python installation, may be required to, e.g., execute python code). 
+Rather than explicitly typing the code chunk, we can use the keyboard shortcut `Ctrl`+`Alt`+`I` (or `Cmd`+`Option`+`I` on macOS) in RStudio.
+If we are using the `Visual` code editor in RStudio, chunks can be added by typing `/` and choosing the appropriate chunk type.
+
+It is also useful to know that we can directly execute a line in a code chunk in the `.qmd` file by placing the cursor on the line and pressing `Ctrl`+`Enter` (or `Cmd`+`Enter` on macOS). 
+A whole chunk can be executed by clicking on the little green arrow in the top right corner of the chunk. 
+The grey arrow executes all chunks preceding the current chunk.
+
+![](images/qmd-execute-arrows.png)
+
+::: {.callout-important title="Python/Visual Studio Code" collapse="true"}
+In Visual Studio Code, we can execute a code chunk by clicking on the `Run Cell` arrow above the chunk: 
+
+![](images/vscode-runcell.png)
+
+We can also use `Ctrl` + `Enter` (`Cmd` + `Enter` on macOS) or `Shift` + `Enter` to execute the chunk in an interactive python session. 
+:::
+
+We can also include inline R code, enclosed in single backticks: `` `{{r}} x + 1` `` (as for the code chunks, we can use different code engines here as well).
+This is useful e.g. if we want to refer to values of specific variables directly in the text.
+A frequent use of this syntax can be seen in the YAML header above - see how the current date was obtained by executing the R function `Sys.Date()`. 
+
+::: {.callout-warning title="Exercise" icon=false}
+Let's now practice what we just learned. 
+In your example `.qmd` document, add a suitable header and a code chunk where you print the first six rows of the built-in `iris` dataset.
+Below the code chunk, add a sentence where you include the number of observations (rows) in the `iris` dataset. 
+:::
+
+::: {.callout-important title="Python/Visual Studio Code" collapse="true"}
+In python, the `iris` dataset is provided via the `scikit-learn` package: 
+
+```{{python}}
+from sklearn import datasets
+iris = datasets.load_iris()["data"]
+```
+:::
+
+# Customizing code chunks 
+
+In addition to the language indicator, there are many other ways of customizing code chunks with so called 'chunk options'. 
+For example, we can decide whether the code should be evaluated at all, whether the code should be shown or hidden in the final report, and the size of any figures generated by the code. 
+We can also add captions and alt-text for any displayed figures, for increased accessibility. 
+Chunk options are specified inside the chunk, preceded by `#|`. 
+For example, the code in the following chunk will be printed, but not executed:
+
+```{{r}}
+#| echo: true
+#| eval: false
+
+1 + 1
+```
+
+For additional controls related to chunk execution, see [this page](https://quarto.org/docs/computations/execution-options.html). 
+The options can also be set globally in the YAML header, under the `execute` directive. 
+Specifications in a given chunk will override the global settings. 
+
+It is often useful to assign labels to the chunks.
+This makes it easier to navigate the document and find the source of any errors, and additionally means that any output figures generated in the document will be named according to the chunk where they were generated. 
+In RStudio, you can navigate between sections and chunks in the lower left corner of the editor panel: 
+
+![](images/qmd-navigate.png)
+
+To label a chunk, add a suitable name as an option:
+
+```{{r}}
+#| label: addition_chunk
+
+1 + 1
+```
+
+# Markdown editing modes
+
+Above, we opened and interacted with the `.qmd` document in 'Source' mode.
+However, RStudio (version 1.4 and newer) also allows us to view and edit the document in 'Visual' mode. In RStudio, we can switch mode by clicking on the corresponding button above the document:
+
+![](images/rmd-mode.png)
+
+This can also be selected in the dialog box when the file is initially created. 
+
+::: {.callout-important title="Python/Visual Studio Code" collapse="true"}
+In Visual Studio Code, we can switch mode by clicking on the three dots to the right of the Preview button, and choosing 'Edit in Visual Mode'.
+:::
+
+In 'Visual' mode, we can edit the document in a perhaps more intuitive way (or, at least, in a way that is more similar to the final rendered version).
+For example, adding headers can now be done by selecting the desired header level from a dropdown menu.
+We can swap between the two editing modes at any time.
+This can also be helpful in order to learn the markdown syntax for specific formatting options.
+
+
+# Parameterized reports
+
+Sometimes, we have a template `.qmd` file from which we would like to generate multiple output files, each with a different value of a given parameter. 
+Instead of generating a separate `.qmd` file for each of these parameter values, we can make use of so called [_parameterized reports_](https://quarto.org/docs/computations/parameters.html). 
+To parameterize your `.qmd` file, add a section in the YAML header defining the parameters that will be used, and provide a default value: 
+
+```{verbatim}
+---
+title: "My first Quarto document"
+author: "Charlotte Soneson"
+date: "`r Sys.Date()`"
+date-format: "long"
+format: 
+    html:
+        toc: true
+        theme: cosmo
+        embed-resources: true
+params:
+    species: "setosa"
+---
+```
+
+You can then use the parameter anywhere in the document via the R syntax `params$species`. 
+Any number of parameters can be specified in this way.
+Now, if the document is rendered via the `Render` button, the default value of each parameter will be used. 
+To change the value, use the `quarto_render()` function from the `quarto` R package and specify the desired parameter values via the `execute_params` argument:
+
+```{r}
+#| eval: false
+
+quarto::quarto_render("qmd-example.qmd", 
+                      execute_params = list(species = "virginica"))
+```
+
+We can also set the name of the output file (we may want this to reflect the parameter value):
+
+```{r, eval=FALSE}
+quarto::quarto_render("qmd-example.qmd", 
+                      execute_params = list(species = "virginica"),
+                      output_file = "virginica_report.html")
+```
+
+::: {.callout-important title="Python/Visual Studio Code" collapse="true"}
+The Jupyter engine uses a different formulation of parameters than the knitr engine. 
+With Jupyter, we create a chunk with the tag "parameters", where we specify the parameter values
+
+```{{python}}
+#| tags: [parameters]
+
+species = "setosa"
+```
+
+These parameters are then available in the top-level environment. 
+To change the parameters, we render the document from the command line: 
+
+```{bash}
+#| eval: false
+
+quarto render qmd-example.qmd -P species:virginica
+```
+
+Note that this requires the `papermill` package. 
+:::
+
+::: {.callout-warning title="Exercise" icon=false}
+To practice this, let's create a parameterized report where instead of printing the size of the entire `iris` dataset as we did above, we only print out the number of observations from the indicated species.
+:::
+
+# Images
+
+Images can be included in `.qmd` files using the following syntax: 
+
+```
+![](path/to/image.png)
+```
+
+Alternatively, we can use `knitr`: 
+
+```{{r}}
+knitr::include_graphics("path/to/image.png")
+```
+
+Or directly HTML: 
+
+```
+<img src="path/to/image.png" width="90%"/>
+```
+
+# Session info
+
+In order to keep a record of the package versions used to generate a given output file, it is useful to include a code chunk providing the session information in the end of every `.qmd` file. 
+Add the following to your example `.qmd`: 
+
+```{{r}}
+sessionInfo()
+```
+
+As a bonus, with a bit of HTML, we can even make it collapsible, to take less space but still be available if requested. 
+
+````
+<details>
+<summary><b>
+Session info
+</b></summary>
+```{{r}}
+sessionInfo()
+```
+</details>
+````
+
+::: {.callout-important title="Python/Visual Studio Code" collapse="true"}
+In python, we can print a session information using the `session_info` package.
+
+```{{python}}
+import session_info
+session_info.show()
+```
+:::
+
+# Assembling figure panels within R
+
+Using the workflow described above, we have a way to reproducibly generate figure panels starting from a suitably processed input data file. 
+In this section, we will see how we can combine these panels into complete figures, which can be directly inserted into your manuscript. 
+For this we will use the [`patchwork`](https://patchwork.data-imaginist.com/) R package. 
+This is not the only R package that allows this type of workflow - you can also have a look at [`cowplot`](https://cran.r-project.org/web/packages/cowplot/vignettes/introduction.html). 
+In python, there is a corresponding package [`patchworklib`](https://pypi.org/project/patchworklib/).
+
+The idea behind these packages is that we create the individual figure panels as usual, and the use the capabilities of (e.g.) `patchwork` to assemble the panels in a suitable configuration. 
+
+Let's look at an example. 
+We start by creating three plots, using the built-in `iris` data set.
+
+
+```{r}
+library(ggplot2)
+(p1 <- ggplot(iris, aes(x = Sepal.Length, y = Petal.Length)) + 
+    geom_point(size = 3, aes(color = Species)) + 
+    theme_bw())
+(p2 <- ggplot(iris, aes(x = Sepal.Length)) + 
+    geom_histogram(bins = 15) + 
+    theme_bw())
+(p3 <- ggplot(iris |> dplyr::mutate(index = seq_along(Petal.Length)), 
+              aes(x = index, y = Sepal.Length)) + 
+    geom_line() + 
+    theme_bw())
+```
+
+Next, we combine them into a single figure using `patchwork`.
+The `|` symbol is used when we want panels to appear next to each other, in the same row. 
+The `/` symbol is used when we want panels to appear underneath each other, in the same column.
+`patchwork` will do its best to align the axes of the different panels as well as possible, to provide a nice and clean visualization. 
+
+```{r}
+library(patchwork)
+(p1 | p2) / p3
+```
+
+`patchwork` works with base plots as well as plots generated using `ggplot2`.
+
+```{r}
+(p1 | ~hist(iris$Sepal.Length)) / p3
+```
+
+We can also include pre-generated image files (e.g., in png format).
+This can be useful if we want to generate figures containing panels with schematics or other types of images that are not generated in R. 
+One way to get such files into R and a format compatible with `patchwork` or `cowplot` is to use the `ggdraw()` and `draw_image()` functions from the `cowplot` package. 
+
+```{r}
+#| fig.height: 4
+#| fig.width: 9
+
+puppy <- cowplot::ggdraw() +
+    cowplot::draw_image("https://publicdomainvectors.org/photos/johnny_automatic_puppy.png")
+p1 | puppy
+```
+
+We can also add a shared title, a caption, and labels for the individual panels. 
+In this way, it is often possible to reproducibly generate figures that can be directly used in a publication. 
+
+```{r}
+p <- (p1 | p2) / p3
+p + plot_annotation(
+    title = "Some plots for the iris data set",
+    caption = "Here we can put source information",
+    tag_levels = 'A'
+) & 
+    theme_minimal()
+```
+
+Many more examples and guidance can be found on the [patchwork website](https://patchwork.data-imaginist.com/).
+
+# Reproducible publishing with journal templates
+
+So far, we have seen how we can write reports and generate complete figures in a reproducible way. 
+This type of reports could, for example, be used as supplementary material for a manuscript. 
+To generate the actual manuscript file, we would still need to paste the results and the generated figures into the Word document that will be submitted to the journal. 
+However, Quarto also provides [journal templates](https://quarto.org/docs/journals/) for several journals, which means that we can directly write our paper using literate programming, and submit the resulting Word/LaTeX/pdf file to the journal.
+If your favorite journal does not already have a template, you can also create your own.
+The setup makes it easy to change between different journal styles, still using the same underlying source file.
+This approach works well for "not-too-computational" manuscripts, where all computations can be run in a single file, and are sufficiently quick that it is not a problem to rerun them each time anything in the manuscript changes. 
+
+Let's try this out - we'll create an example journal article, using the style from the PLOS family of journals. 
+Typing the following code into a terminal window will initialize a new `.qmd` file following this journal template style:
+
+```{bash}
+#| eval: false
+
+quarto use template quarto-journals/plos
+```
+
+The resulting file can then be edited and expanded upon like any other Quarto file. 
+If you just want to install the journal format extension (without creating a new document), e.g. to use it in an existing document, you can do that by running the following code from within the target directory:
+
+```{bash}
+#| eval: false
+
+quarto add quarto-journals/plos
+```
+
+# Quarto Manuscripts
+
+An even more comprehensive toolbox for publishing manuscripts is provided by the _Quarto Manuscripts_ framework. 
+Here, each Quarto manuscript is its own [Quarto project](https://quarto.org/docs/projects/quarto-projects.html) (not just a single file).
+The manuscript will be rendered in multiple formats, which can all be accessed via a generated website. 
+Separate notebooks can also be used as a source of content and computations. 
+Thus, this approach, while more complex than what we have seen before, is really aimed at producing fully reproducible manuscripts for projects involving lots of computation, perhaps in different languages, which can not all be re-executed every time the manuscript text changes.
+
+An example can be seen [here](https://notebooks-now.github.io/submission-quarto-full/).
+To initialize such a manuscript, we have to create a Quarto project. 
+This can be done from the command line as follows: 
+
+```{bash}
+#| eval: false
+
+quarto create project manuscript my_awesome_manuscript
+```
+
+This will create a Quarto project in a new folder named `my_awesome_manuscript`, and you can further choose to open it in either RStudio or Visual Studio Code. 
+
+# Final tips
+
+* Always include the session info.
+* Avoid hardcoded absolute paths, they will make it impossible for someone else to reproduce your analysis. 
+* With parameterized reports, it's helpful to print out the values of the parameters somewhere in the report for reproducibility purposes, as the final report may have been generated from the command line with parameter values different from the default ones contained in the source file. 
+
+# Conclusion
+
+In this workshop, we have seen how we can use Quarto to generate reproducible reports containing both text, code and output.
+Of course this is not the only way to make analyses reproducible - done correctly, a regular script can be just as reproducible. 
+One nice aspect of literate programming, however, is that you can be sure that if the document compiles, the code actually works, you will see exactly how each figure was generated, and there is no way to 'leave out' or miss any details. 
+With a script, you need some level of trust that this was, in fact, the code that was used to generate the saved figures. 
+In addition, there are many other aspects that are essential for reproducibility that we have not touched upon here, including making all data accessible, and if possible providing a reproducible software environment (for example, using conda environments or docker images). 
+
+# Resources
+
+- [RStudio keyboard shortcuts](https://bookdown.org/yihui/rmarkdown-cookbook/rstudio-shortcuts.html)
+- [Quarto webpage](https://quarto.org/)
+- [Quarto introductory tutorial](https://quarto.org/docs/get-started/hello/rstudio.html)
+- [Quarto authoring guide](https://quarto.org/docs/get-started/authoring/rstudio.html)
+- [More details about article layout in Quarto](https://quarto.org/docs/authoring/article-layout.html)
+- [R Markdown cheat sheet from RStudio](https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf)
+- [R Markdown reference guide](https://www.rstudio.com/wp-content/uploads/2015/03/rmarkdown-reference.pdf)
+- [R Markdown crash course](https://zsmith27.github.io/rmarkdown_crash-course/index.html)
+- [R Markdown website](https://rmarkdown.rstudio.com/)
+- [Lessons on R Markdown](https://rmarkdown.rstudio.com/lesson-1.html)
+- [R Markdown - the definitive guide](https://bookdown.org/yihui/rmarkdown/)
+- [R Markdown cookbook](https://bookdown.org/yihui/rmarkdown-cookbook/)
+- [Blog post on Quarto vs Rmarkdown](https://yihui.org/en/2022/04/quarto-r-markdown/#:~:text=For%20R%20users%2C%20Quarto%20uses,implementation%20of%20figure%20cross%2Dreferences.)
+- [Quarto/R Markdown - what's different](https://laderast.github.io/qmd_rmd/#/title-slide)
+- [Quarto extensions - journal articles](https://quarto.org/docs/extensions/listing-journals.html)
+- [Reproducible manuscripts with Quarto (talk by JJ Allaire)](https://jjallaire.quarto.pub/reproducible-manuscripts-with-quarto/#/title-slide)
+- [Quarto webR extension for building interactive websites](https://quarto-webr.thecoatlessprofessor.com/)
+- [Hello Quarto! Keynote from rstudio::conf(2022)](https://www.youtube.com/watch?v=p7Hxu4coDl8)
+- [Quarto introduction in R4DS book](https://r4ds.hadley.nz/quarto)
+- [A Primer on dynamic reporting](https://zenodo.org/records/8354360)
+- [Reproducible manuscripts with Quarto (talk by Mine Cetinkaya-Rundel)](https://mine.quarto.pub/manuscripts-conf23/#/title-slide)
