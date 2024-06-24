@@ -17,10 +17,12 @@ Labs are organized by topic, using only a short identifier
 
 * [Bulk RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/bulk-rnaseq/rnaseqGene_CSAMA2024.html) - `bulk-rnaseq`
 * [Single cell RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/single-cell-rnaseq/singlecell_CSAMA2024.html) - `single-cell-rnaseq`
+* [Advanced single-cell RNA-seq analysis](https://ccb-hms.github.io/osca-workbench/)
 
 ### Thursday / Friday
 
 * [Mass spectrometry-based proteomics](https://rformassspectrometry.github.io/book/)
+* [Spatial transcriptomics](https://bioconductor.github.io/CSAMA-labs/spatial-transcriptomics/spatial_CSAMA.html)
 
 ## Instructors: setting up git pre-commit hooks
 
