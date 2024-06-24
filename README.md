@@ -18,7 +18,7 @@ Labs are organized by topic, using only a short identifier
 
 ### Thursday / Friday
 
-* ...
+* [Mass spectrometry-based proteomics](https://rformassspectrometry.github.io/book/)
 
 ## Instructors: setting up git pre-commit hooks
 
