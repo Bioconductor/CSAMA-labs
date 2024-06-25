@@ -54,7 +54,7 @@ For each of the four cell lines, we have a treated and an untreated sample.
 For more description of the experiment see the [PubMed entry 24926665](http://www.ncbi.nlm.nih.gov/pubmed/24926665) and for raw data see the [GEO entry GSE52778](http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778).
 
 The *airway2* package contains output from *Salmon* [@Patro2017Salmon], as well as a metadata file with sample annotations. 
-More information about how the raw data was processed is available in this [script](https://github.com/mikelove/airway2/blob/master/inst/scripts/salmon.R).
+More information about how the raw data was processed is available in this [script](https://gist.github.com/mikelove/5a8134e57f652f970f1a176efc900cbe).
 
 We start by setting the path to the folder containing the quantifications (the output folders from *Salmon*). 
 Since these are provided with an R package, we will point to the `extdata` subfolder of the installed package. 
