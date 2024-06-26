@@ -1,0 +1,197 @@
+---
+title: "Differential chromatin accessibility and gene expression"
+format: html
+---
+
+# Differential expression from RNA-seq
+
+```{r}
+#| eval: FALSE
+dir <- system.file("extdata", package="macrophage")
+library(tximeta)
+makeLinkedTxome(
+  indexDir=file.path(dir, "gencode.v29_salmon_0.12.0"),
+  source="Gencode",
+  organism="Homo sapiens",
+  release="29",
+  genome="GRCh38",
+  fasta="ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_29/gencode.v29.transcripts.fa.gz",
+  gtf=file.path(dir, "gencode.v29.annotation.gtf.gz"), # local version
+  write=FALSE
+)
+```
+
+```{r}
+dir <- system.file("extdata", package="macrophage")
+library(dplyr)
+library(readr)
+colfile <- file.path(dir, "coldata.csv")
+coldata <- read_csv(colfile) |>
+  dplyr::select(
+    names,
+    id = sample_id,
+    line = line_id,
+    condition = condition_name
+  ) |>
+  dplyr::mutate(
+    files = file.path(dir, "quants", names, "quant.sf.gz"),
+    line = factor(line),
+    condition = relevel(factor(condition), "naive")
+  )
+coldata
+```
+
+```{r}
+library(SummarizedExperiment)
+library(tximeta)
+se <- tximeta(coldata, dropInfReps=TRUE, useHub=FALSE, skipSeqinfo=TRUE)
+```
+
+```{r}
+gse <- summarizeToGene(se, assignRanges="abundant")
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSet(gse, ~line + condition)
+dds <- dds[,dds$condition %in% c("naive","IFNg")]
+dds$condition <- droplevels(dds$condition)
+dds$condition <- relevel(dds$condition, "naive")
+keep <- rowSums(counts(dds) >= 10) >= 6
+dds <- dds[keep,]
+```
+
+The model is fit with the following line of code:
+
+```{r deseq2}
+dds <- DESeq(dds)
+res <- results(dds, lfcThreshold=1)
+summary(res)
+```
+
+To see the results of the expression analysis, we can generate a summary table
+and an MA plot:
+
+```{r}
+#| eval: false
+DESeq2::plotMA(res, ylim=c(-10,10))
+```
+
+```{r}
+library(plyranges)
+all_genes <- results(dds, lfcThreshold=1, format="GRanges") |>
+  names_to_column("gene_id") |>
+  select(gene_id, de_log2FC = log2FoldChange, de_padj = padj, de_pval = pvalue)
+genome(all_genes) <- "hg38"
+si <- Seqinfo(genome="hg38")
+#save(Seqinfo, file="seqinfo.rda")
+load("seqinfo.rda")
+si <- keepStandardChromosomes(si)
+seqinfo(all_genes) <- si
+```
+
+# Differential accessibility from ATAC-seq
+
+The following section describes the process we have used for generating a
+*GRanges* object of differential peaks from the ATAC-seq data in @alasoo.
+The code chunks for the remainder of this section are not run.  For
+assessing differential accessibility, we followed the original paper,
+using *limma* [@Smyth2004], and generating a summary of LFCs and
+adjusted p-values for the peaks.
+
+```{r}
+#| eval: false
+library(fluentGenomics)
+# atac <- readRDS(cache_atac_se())
+library(limma)
+design <- model.matrix(~donor + condition, colData(atac))
+fit <- lmFit(assay(atac), design)
+fit <- eBayes(fit)
+idx <- which(colnames(fit$coefficients) == "conditionIFNg")
+tt <- topTable(fit, coef=idx, sort.by="none", n=nrow(atac))
+atac_peaks <- rowRanges(atac) |>
+  remove_names() |>
+  mutate(
+    da_log2FC = tt$logFC,
+    da_padj = tt$adj.P.Val
+  ) |>
+  set_genome_info(genome = "hg38")
+seqlevelsStyle(atac_peaks) <- "UCSC"
+```
+
+The final *GRanges* object containing the DA peaks is included in the workflow
+package and can be loaded as follows:
+
+```{r}
+library(fluentGenomics)
+peaks
+seqlevels(peaks) <- seqlevels(si)
+seqinfo(peaks) <- si
+```
+
+## Integration of RNA-seq and ATAC-seq differential results
+
+```{r}
+da_peaks <- peaks |>
+  filter(da_padj < .01, abs(da_log2FC) > .5)
+tss_by_de <- all_genes |>
+  mutate(de_sig =
+           case_when(
+             de_padj <= .01 ~ "de",
+             TRUE ~ "non-de"
+         )) |>
+  filter(!dplyr::between(de_padj, .01, .99)) |>
+  anchor_5p() |>
+  mutate(width=1)
+dist_res <- tss_by_de |>
+  add_nearest_distance(da_peaks)
+dist_res_clean <- dist_res |>
+  as_tibble() |>
+  tidyr::drop_na()
+dist_res_clean |>
+  group_by(de_sig) |>
+  summarize(mean = mean(distance), sd = sd(distance))
+
+```
+
+```{r}
+#| label: distances
+
+library(ggplot2)
+dist_res_clean |>
+  filter(distance < 1e6) |>
+  mutate(log10_dist = log10(distance + 1)) |>
+  ggplot(aes(log10_dist, color=de_sig)) +
+  geom_density()
+
+```
+
+```{r}
+dist_res %>%
+  mutate(near_peaks = count_overlaps(., da_peaks, maxgap=100)) |>
+  as_tibble() |> 
+  dplyr::count(de_sig, near_peaks)
+```
+
+```{r}
+library(nullranges)
+da_peaks_chr <- da_peaks |>
+  dropSeqlevels(c("chrY","chrM")) |>
+  sort()
+set.seed(1)
+boot <- bootRanges(da_peaks_chr, blockLength=1e6, R=5)
+```
+
+```{r}
+all_peaks <- bind_ranges(
+  da_peaks %>% mutate(iter=0),
+  boot
+)
+tss_by_de |>
+  join_overlap_inner(all_peaks, maxgap=100) |>
+  as_tibble() |>
+  select(gene_id, peak_id, de_sig, iter) |>
+  group_by(de_sig, iter) |>
+  summarize(overlaps_any = n_distinct(gene_id))
+
+```
