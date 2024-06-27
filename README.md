@@ -27,6 +27,7 @@ Labs are organized by topic, using only a short identifier
 
 * [Mass spectrometry-based proteomics](https://rformassspectrometry.github.io/book/)
 * [Spatial transcriptomics](https://bioconductor.github.io/CSAMA-labs/spatial-transcriptomics/spatial_CSAMA.html)
+* [Interactive exploration with iSEE](https://csoneson.github.io/isee-lab-csama2024/)
 
 ## Instructors: setting up git pre-commit hooks
 
