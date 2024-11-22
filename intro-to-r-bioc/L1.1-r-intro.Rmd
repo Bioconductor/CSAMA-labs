@@ -581,7 +581,7 @@ brfss <- read.csv(fname)
    setting level, or it can be disabled with `se=FALSE`.
 
     ```{r ggplot2-regression-2, eval=FALSE}
-    sp + geom_point() + stat_smooth(method=lm + level=0.95)
+    sp + geom_point() + stat_smooth(method=lm, level=0.95)
     sp + geom_point() + stat_smooth(method=lm, se=FALSE)
     ```
 
