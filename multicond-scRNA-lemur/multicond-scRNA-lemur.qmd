@@ -18,9 +18,25 @@ params:
   skip_seurat: true
 ---
 
-![Figure 1 from *Analysis of multi-condition single-cell data with latent embedding multivariate regression* by @ahlmann-eltze2024. The goal is to identify cells that show gene expression changes associated with experimental perturbations or study conditions.](images/lemur_figure.png)
+# What you will learn in this lab
 
-# Setup
+Our objective is to compare single cell RNA-seq data from multiple, heterogeneous tissue samples across conditions. 
+An obvious approach is to divide the constituent cells into clusters meant to represent cell types and, for each cluster separately, do "pseudo-bulk" differential expression with methods such as edgeR or DESEq2. 
+However, such discrete categorization tends to be an unsatisfactory model of the
+underlying biology. 
+Here, we use latent embedding multivariate regression (LEMUR) (@AhlmannEltze:NatGen:2025), a model that operates without, or before, commitment to discrete categorization. 
+LEMUR 
+
+- integrates data from different conditions, 
+- predicts each cell’s gene expression changes as a function
+of the conditions and its position in latent space and
+- for each gene, identifies a compact neighborhood of cells with consistent differential
+expression. 
+
+
+![Figure 1 from *Analysis of multi-condition single-cell data with latent embedding multivariate regression* by @AhlmannEltze:NatGen:2025. The goal is to identify cells that show gene expression changes associated with experimental perturbations or study conditions.](images/lemur_figure.png)
+
+# Getting started
 
 To start, we load the `tidyverse` and `SingleCellExperiment` packages:
 
@@ -39,11 +55,11 @@ library("SingleCellExperiment")
 set.seed(1)
 ```
 
-The call to `set.seed`, to set the initial conditions ("seed") of R's random number generator, is optional. We make it here to ensure that the results are exactly the same for everyone. Some of the methods here use stochastic sampling, but the expectation is that even with different random seeds, the results will be essentially, for all practical intents and purposes, the same. You can verify this by omiting the call to `set.seed` or calling with a different argument.
+The call to `set.seed`, to set the initial conditions ("seed") of R's random number generator, is optional. We make it here to ensure that the results are exactly the same for everyone. Some of the methods here use stochastic sampling, but the expectation is that even with different random seeds, the results will be essentially, for all practical intents and purposes, the same. You can verify this by omiting the call to `set.seed` or calling it with a different argument.
 
 # Example data
 
-We consider a popular dataset by @kang2018. The authors measured the effect of interferon-$\beta$ stimulation on blood cells from eight patients. The [`muscData`](https://bioconductor.org/packages/muscData/) package provides the data as a [`SingleCellExperiment`](https://bioconductor.org/books/release/OSCA.intro/the-singlecellexperiment-class.html). 
+We consider a dataset by @kang2018. The authors measured the effect of interferon-$\beta$ stimulation on blood cells from eight patients. The [`muscData`](https://bioconductor.org/packages/muscData/) package provides the data as a [`SingleCellExperiment`](https://bioconductor.org/books/release/OSCA.intro/the-singlecellexperiment-class.html). 
 If downloading the data with the `muscData` package fails, you can also directly download the file from <http://oc.embl.de/index.php/s/tpbYcH5P9NfXeM5> and load it into R using `sce = readRDS("PATH_TO_THE_FILE")`.
 
 ```{r}
@@ -57,14 +73,14 @@ sce
 ::: {.callout-note collapse="true"}
 ## Challenge: How many genes and cells are in the data? How do you find the metadata about each cell / gene?
 
-You can find the number of genes and cells when printing the summary of the `sce`. Alternatively, you can use `nrow(sce)`, `ncol(sce)`, or `dim(sce)` to get these values.
+You can read about the number of genes and cells when printing the summary of the `sce`. Alternatively, you can use `nrow(sce)`, `ncol(sce)`, or `dim(sce)` to get these values.
 
 In a `SingleCellExperiment` object, the metadata ("data about data") on the cells are accessed with `colData(sce)`, and those on the genes with `rowData(sce)`. 
 
 Follow-up question: why does the documentation for `colData` (run `?colData` in the R console) talk about `SummarizedExperiment` objects instead of `SingleCellExperiment`?
 :::
 
-We logarithm transform the data to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to reduce dimensionality, and run UMAP for visualization. We use the [`scater`](https://bioconductor.org/packages/scater/) package, which adds a new slot called `logcounts` and the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
+First, to visually explore the data, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional, smoothed embedding vector, and then further call UMAP to map these into a 2-dimensional representation for visualization on the screen. We use the [`scater`](https://bioconductor.org/packages/scater/) package, which adds a new slot called `logcounts` and the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
 
 ```{r}
 #| label: kang_preprocess
@@ -72,8 +88,6 @@ We logarithm transform the data to account for the heteroskedasticity of the cou
 sce = scater::logNormCounts(sce)
 hvg = order(MatrixGenerics::rowVars(logcounts(sce)), decreasing = TRUE)
 sce = sce[hvg[1:500], ]
-# _Note_: in case you get an error about `"function 'as_cholmod_sparse' not provided by package 'Matrix'"`, 
-# please reinstall the `irlba` package from source (`install.packages("irlba", type = "source")`)!
 sce = scater::runPCA(sce, ncomponents = 50)
 sce = scater::runUMAP(sce, dimred = "PCA")
 ```
@@ -95,7 +109,7 @@ assay(sce, "pearson_residuals") = transformGamPoi::residual_transform(sce, resid
 
 Too few dimensions for PCA mean that it cannot capture enough of the relevant variation in the data. This leads to a loss of subtle differences between cell states.
 
-Too many dimensions for PCA can also pose a problem. PCA smoothes out the sampling noise in the data. If too many PCA components are included, the smoothing is too weak, and the additional dimensions capture noise that can obscure biologically relevant differences. For more details see Fig. 2d in @ahlmann-eltze2023.
+Too many dimensions for PCA can also pose a problem. The objective of doing PCA with a number of components that is smaller than that of the original data, is to smooth out the sampling noise in the data. If too many PCA components are included, the smoothing is too weak, and the additional dimensions capture noise that can obscure biologically relevant differences. For more details see Fig. 2d in @ahlmann-eltze2023.
 :::
 
 ::: {.callout-note collapse="true"}
@@ -109,7 +123,7 @@ The scater package also provides a `runTSNE` function
 sce = scater::runTSNE(sce, dimred = "PCA")
 ```
 
-On the one hand, tSNE and UMAP are de facto standards for visualizing the cell states in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested:
+On one hand, tSNE and UMAP are de facto standards for visualizing the cell type and state space in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested:
 
 - Force directed layout of the $k$ nearest neighbor (kNN) graph ([igraph](https://igraph.org/r/doc/layout_with_fr.html)),
 - [PHATE](https://github.com/KrishnaswamyLab/PHATE)
@@ -117,8 +131,7 @@ On the one hand, tSNE and UMAP are de facto standards for visualizing the cell s
 - Unification of tSNE and UMAP using contrastive learning ([Böhm, 2023](https://arxiv.org/pdf/2210.09879.pdf))
 :::
 
-
-In this tutorial, we use `ggplot2` to visualize the data. This is often more verbose than calling a higher-level, specialized wrapper function (e.g., `scater::plotReducedDim(sce, "UMAP", color_by = "stim")`), on the other hand, it has the advantage that we can more easily customize our plots.
+In this tutorial, we use `ggplot2` to visualize the data. This is a little more verbose than calling a higher-level, specialized wrapper function (e.g., `scater::plotReducedDim(sce, "UMAP", color_by = "stim")`), on the other hand, it has the advantage that we can more easily customize our plots.
 
 In the below two UMAP plots, the cells separate by treatment status (`stim`), as well as by annotated cell type (`cell`). One goal of this tutorial is to understand how different approaches use these covariates to integrate the data into a shared embedding space or representation.
 
@@ -128,7 +141,9 @@ In the below two UMAP plots, the cells separate by treatment status (`stim`), as
 #| eval: !expr (! params$skip_execution)
 as_tibble(colData(sce)) |>
   mutate(umap = reducedDim(sce, "UMAP")) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) + geom_point(aes(color = stim), size = 0.3) + coord_fixed()
+  ggplot(aes(x = umap[,1], y = umap[,2])) + 
+    geom_point(aes(color = stim), size = 0.3) +
+    coord_fixed()
 ```
 
 ::: {.callout-note collapse="true"}
@@ -411,7 +426,7 @@ In the next sections we discuss these steps in more detail.
 
 Tools like MNN and Harmony take a PCA embedding and remove the effects of the specified covariates. However, there is no way to go back from the integrated embedding to the original gene space. This means that we cannot ask the counterfactual what the expression of a cell from the control condition would have been, had it been treated.
 
-[LEMUR](https://bioconductor.org/packages/lemur/) achieves such counterfactuals by matching the subspaces of each condition [@ahlmann-eltze2024]. @fig-subspace_matching illustrates the principle. In some sense this is a more sophisticated version of the manual matching that we saw in the previous section. The matching is a single affine transformation in contrast to Harmony's inferred shifts per cluster.
+[LEMUR](https://bioconductor.org/packages/lemur/) achieves such counterfactuals by matching the subspaces of each condition [@AhlmannEltze:NatGen:2025]. @fig-subspace_matching illustrates the principle. In some sense this is a more sophisticated version of the manual matching that we saw in the previous section. The matching is a single affine transformation in contrast to Harmony's inferred shifts per cluster.
 
 ![Schematic picture of data from two conditions with the respective linear subspace.](images/Subspace_illustration_both_condition_with_arrow.png){#fig-subspace_matching width="40%"}
 
@@ -686,7 +701,7 @@ LEMUR can handle arbitrary design matrices as input, which means that it can als
 - interactions, e.g., drug treatment in wild type and mutant,
 - continuous covariates, e.g., time courses, whose effects can also be modeled using smooth non-linear functions (spline regression). 
 
-For more details, see @ahlmann-eltze2024. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
+For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
 
 
 # Session Info
