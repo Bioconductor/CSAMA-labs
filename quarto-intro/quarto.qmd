@@ -2,7 +2,7 @@
 title: "Reproducible publishing and literate programming with Quarto"
 author: "Charlotte Soneson"
 license: "Distributed under CC-BY license"
-date: "2024-06-24"
+date: "2025-07-07"
 date-format: long
 format: 
     html:
@@ -80,7 +80,7 @@ For general instructions on how to install `Quarto`, see
 
 Recent versions of RStudio comes with built-in support for `Quarto`. Thus, 
 we recommend installing a recent version of R (the current release version is 
-4.4) and RStudio, e.g. following the links and instructions available at 
+4.5) and RStudio, e.g. following the links and instructions available at 
 [https://posit.co/download/rstudio-desktop/](https://posit.co/download/rstudio-desktop/).
 
 In order to render documents into pdf format, `Quarto` needs to be able to 

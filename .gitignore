@@ -5,3 +5,4 @@
 *.gz
 *.zip
 *.knit.md
+.Rproj.user
