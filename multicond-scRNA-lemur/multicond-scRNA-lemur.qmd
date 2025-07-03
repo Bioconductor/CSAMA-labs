@@ -10,6 +10,7 @@ format:
     highlight-style: github
     toc: true 
     code-line-numbers: false 
+lightbox: true
 bibliography: references.bib
 params:
   skip_execution: false
@@ -38,7 +39,7 @@ expression.
 
 # Getting started
 
-To start, we load the `tidyverse` and `SingleCellExperiment` packages:
+To start, we attach the `tidyverse` and `SingleCellExperiment` packages:
 
 ```{r}
 #| label: initialize
@@ -50,12 +51,17 @@ knitr::opts_chunk$set(cache = TRUE, autodep = TRUE)
 #| label: load_packages
 #| output: false
 #| eval: !expr (! params$skip_execution)
+#| echo: !expr 1:3
 library("tidyverse")
 library("SingleCellExperiment")
 set.seed(1)
+options(ggplot2.discrete.fill   = RColorBrewer::brewer.pal(9, "Set1"))
+options(ggplot2.discrete.colour = RColorBrewer::brewer.pal(9, "Set1"))
 ```
 
-The call to `set.seed`, to set the initial conditions ("seed") of R's random number generator, is optional. We make it here to ensure that the results are exactly the same for everyone. Some of the methods here use stochastic sampling, but the expectation is that even with different random seeds, the results will be essentially, for all practical intents and purposes, the same. You can verify this by omiting the call to `set.seed` or calling it with a different argument.
+::: {.column-margin}
+The call to `set.seed`, to set the initial conditions ("seed") of R's random number generator, is optional. Here, it ensures that the results are exactly the same for everyone. Some of the methods here use stochastic sampling, but the expectation is that even with different random seeds, the results will be essentially the same. You can verify this by omiting the call to `set.seed` or calling it with a different argument.
+:::
 
 # Example data
 
@@ -71,7 +77,7 @@ sce
 
 
 ::: {.callout-note collapse="true"}
-## Challenge: How many genes and cells are in the data? How do you find the metadata about each cell / gene?
+## Question: How many genes and cells are in the data? How do you find the metadata about each cell / gene?
 
 You can read about the number of genes and cells when printing the summary of the `sce`. Alternatively, you can use `nrow(sce)`, `ncol(sce)`, or `dim(sce)` to get these values.
 
@@ -80,7 +86,7 @@ In a `SingleCellExperiment` object, the metadata ("data about data") on the cell
 Follow-up question: why does the documentation for `colData` (run `?colData` in the R console) talk about `SummarizedExperiment` objects instead of `SingleCellExperiment`?
 :::
 
-First, to visually explore the data, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional, smoothed embedding vector, and then further call UMAP to map these into a 2-dimensional representation for visualization on the screen. We use the [`scater`](https://bioconductor.org/packages/scater/) package, which adds a new slot called `logcounts` and the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
+First, to visually explore the data, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional, smoothed embedding vector, and then further call UMAP to map these vectors into a 2-dimensional representation for visualization on the screen. We use the [`scater`](https://bioconductor.org/packages/scater/) package, which adds a new slot called `logcounts` and the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
 
 ```{r}
 #| label: kang_preprocess
@@ -93,7 +99,7 @@ sce = scater::runUMAP(sce, dimred = "PCA")
 ```
 
 ::: {.callout-note collapse="true"}
-## Challenge: How would you do a sctransform-like transformation (i.e., Pearson residuals) without using Seurat?
+## Question: How would you do a sctransform-like transformation (i.e., Pearson residuals) without using Seurat?
 
 The [transformGamPoi](https://bioconductor.org/packages/release/bioc/vignettes/transformGamPoi/inst/doc/transformGamPoi.html) package from Bioconductor provides a `residual_transform` function.
 
@@ -123,7 +129,7 @@ The scater package also provides a `runTSNE` function
 sce = scater::runTSNE(sce, dimred = "PCA")
 ```
 
-On one hand, tSNE and UMAP are de facto standards for visualizing the cell type and state space in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested:
+On one hand, tSNE and UMAP are de facto standards for visualizing the cell type and state space in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested, see e.g.:
 
 - Force directed layout of the $k$ nearest neighbor (kNN) graph ([igraph](https://igraph.org/r/doc/layout_with_fr.html)),
 - [PHATE](https://github.com/KrishnaswamyLab/PHATE)
@@ -131,9 +137,11 @@ On one hand, tSNE and UMAP are de facto standards for visualizing the cell type 
 - Unification of tSNE and UMAP using contrastive learning ([Böhm, 2023](https://arxiv.org/pdf/2210.09879.pdf))
 :::
 
-In this tutorial, we use `ggplot2` to visualize the data. This is a little more verbose than calling a higher-level, specialized wrapper function (e.g., `scater::plotReducedDim(sce, "UMAP", color_by = "stim")`), on the other hand, it has the advantage that we can more easily customize our plots.
+In the below two UMAP plots, the cells' positions strongly separate by treatment status (`stim`), as well as by annotated cell type (`cell`). One goal of this tutorial is to understand how different approaches use these covariates to integrate the data into shared embedding spaces or representations.
 
-In the below two UMAP plots, the cells separate by treatment status (`stim`), as well as by annotated cell type (`cell`). One goal of this tutorial is to understand how different approaches use these covariates to integrate the data into a shared embedding space or representation.
+::: {.column-margin}
+In this tutorial, we use direct calls to functions in the `ggplot2` package to visualize our data. This is a little more verbose than calling higher-level, specialized wrapper functions (e.g., `scater::plotReducedDim(sce, "UMAP", color_by = "stim")`), on the other hand, you see more directly what is going on.
+:::
 
 ```{r}
 #| label: fig-kang-umap
@@ -147,7 +155,7 @@ as_tibble(colData(sce)) |>
 ```
 
 ::: {.callout-note collapse="true"}
-## Challenge: The `colData(sce)$ind` column lists the patient identifier for each cell. Can you use this to create a separate plot for each patient?
+## Question: The `colData(sce)$ind` column lists the patient identifier for each cell. Can you use this to create a separate plot for each patient?
 
 One solution could be to use a `for` loop and filter the data for each patient, but there is a much simpler solution! Adding [facet_wrap()](https://ggplot2.tidyverse.org/reference/facet_wrap.html) to the ggplot call will automatically create a subpanel for each patient:
 
@@ -157,18 +165,24 @@ One solution could be to use a `for` loop and filter the data for each patient, 
 as_tibble(colData(sce)) |>
   mutate(umap = reducedDim(sce, "UMAP")) |>
   ggplot(aes(x = umap[,1], y = umap[,2])) + geom_point(aes(color = stim), size = 0.3) + coord_fixed() +
-    facet_wrap(vars(ind))
+    facet_wrap(vars(ind), ncol = 4)
 ```
 :::
 
-This dataset already comes with cell type annotations. The cell type labels help interpret the results; however, for the purpose of this tutorial, we will not need them and will ignore them from now on.
+::: {.callout-note collapse="true"}
+## Question: Why do we use `coord_fixed()` in the above plots?
+Dimension reduction methods such as UMAP put in considerable effort to approximate the distance relationships between the points by arranging them in the Euclidean 2D plane, so it would be a shame to distort this by incidental figure size settings and by distinct scalings of the $x$- and the $y$-axis. 
+:::
+
+This dataset already comes with cell type annotations. The cell type labels help interpret the results; however, for the purpose of this tutorial, we will not need them and, besides @fig-kang-umap2, will ignore them.
 
 ```{r}
 #| label: fig-kang-umap2
 #| fig-cap: Cell type labels
 #| eval: !expr (! params$skip_execution)
 #| warning: false
-label_pos_df = as_tibble(colData(sce)) |>
+#| fig-dim: !expr 10 * c(1, 1)
+centroids = as_tibble(colData(sce)) |>
   mutate(umap = reducedDim(sce, "UMAP")) |>
   summarize(umap = matrix(colMedians(umap), nrow = 1), .by = c(stim, cell))
 
@@ -176,8 +190,8 @@ label_pos_df = as_tibble(colData(sce)) |>
 as_tibble(colData(sce)) |>
   mutate(umap = reducedDim(sce, "UMAP")) |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
-    geom_point(aes(color = cell), size = 0.3) +
-    ggrepel::geom_text_repel(data = label_pos_df, aes(label = cell)) +
+    geom_point(aes(color = paste(stim, cell)), size = 0.3) +
+    ggrepel::geom_text_repel(data = centroids, aes(label = paste(stim, cell))) +
     coord_fixed()
 ```
 
@@ -210,25 +224,24 @@ Seurat::DimPlot(seur_obj, reduction = "umap", group.by = "stim")
 
 # Data integration
 
-@fig-kang-umap shows that the cell embedding locations separate by treatment status. For many analyses, we would like to overlay the cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**.
+When we made @fig-kang-umap, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**.
 
-The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all residual variance comes from different cell states. @fig-integrated_picture shows an example.
+The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
 
-![UMAP of a successfully integrated dataset.](images/integrated_data_picture.png){#fig-integrated_picture}
+!["Integrated" UMAP.](images/integrated_data_picture.png){#fig-integrated_picture}
 
-There are many approaches for single-cell data integration (the question is somewhat ill-defined and can be formalized into a mathematical algorithm in many different ways). @luecken2022 benchmarked several approaches. Here, we show how to do the integration manually, or with `harmony`. Later we will compare both to `LEMUR`.
+There are many approaches to this end. The question is somewhat ill-defined and can be formalized into a mathematical algorithm in many different ways. @luecken2022 benchmarked several approaches. Here, we first show how to do an integration manually, then with `harmony`. Later we will compare both to `LEMUR`.
 
 ::: {.callout-note collapse="true"}
 ## Question: In this tutorial we will just look at plots to assess integration success. Why is that suboptimal? How can we do better?
 
-A 2D embedding like UMAP or tSNE gives us a first impression if cells from different conditions are mixed, but the results are not quantitative, which means we cannot objectively assess or compare the quality of the result.
+A 2D embedding like UMAP or tSNE gives us a visual impression if variation that comes  from "uninteresting" covariates (here: treatment condition) is eliminated and variation that comes from covariates we care about is retained, but the results are not quantitative, which means we cannot objectively assess or compare the quality of the result.
 
-One simple metric to measure integration success is to see how mixed the conditions are. For example we can count for each cell how many of the nearest neighbors come from the same condition and how many come from the other conditions. For more information see @luecken2022.
+One simple metric to measure integration success is to see how mixed the cells from the two conditions are. For example, we can count for each cell how many of its $k$ nearest neighbors come from the same condition and how many come from the other condition(s), and then look at the distribution of this fraction. For more, see @luecken2022.
 
 Follow-up challenge: Write a function to calculate the mixing metric.
 
-Follow-up questions: Can you write an integration function, that scores perfectly on the integration metric? Hint: it can be biologically completely useless. What else would you need to measure to protect against such a pathological solutions?
-
+Follow-up questions: Can you write an integration function that scores perfectly on this mixing metric? Hint: it can be biologically completely useless. What else would you need to measure to protect against such silly solutions?
 :::
 
 
@@ -236,9 +249,14 @@ Follow-up questions: Can you write an integration function, that scores perfectl
 
 ![Schematic picture of data from two conditions. The data from the treated condition is projected onto the subspace spanned by the control condition.](images/Subspace_illustration_both_condition_projection.png){#fig-ctrl-proj width="40%"}
 
-In transcriptomic data analysis, each cell is characterized by its gene expression profile. In our case, we decided to consider the 500 most variable genes. Accordingly, each cell is a point in a 500-dimensional _gene expression space_. Principal component analysis (PCA) finds a $P$-dimensional space ($P\le500$) such that overall, distances between each cell in the original space and the reduced space are minimized. 
+In transcriptomic data analysis, each cell is characterized by its gene expression profile, which here we operationalize as the vector of counts for the 500 most variable genes. Accordingly, each cell is a point in a 500-dimensional _gene expression space_. Principal component analysis (PCA) finds a $P$-dimensional space ($P\le500$) such that overall, distance relationships between cells in the original space are optimally approximated by those in the reduced, $P$-dimensional space. 
 
-To make these concepts more tangible, consider the cartoon in @fig-ctrl-proj. The orange blob represents all cells from the control condition in a 3-dimensional gene expression space. The grey planar rectangle $R$ is a lower-dimensional subspace covering the shape of the orange blob. The shape of the blue blob (i.e., the treated cells) resembles the orange blob but is slightly offset, in a different planar rectangle. To integrate both conditions, we can project the two planes onto each other, so that each point from the blue blob is mapped into the orange subspace.
+::: {.column-margin}
+Although there are over 20,000 genes in the human genome, the sensitivity of the assay that was used for our dataset is such that only a much smaller number of genes are well-measured, i.e., have counts high enough to be informative. Whether we use the top 500 genes by mean or by standard deviation makes no big difference. 
+:::
+
+To make these concepts more tangible, consider the cartoon in @fig-ctrl-proj. The orange blob represents an optimal two-dimensional embedding of all cells from the control condition. Similarly, the blue blob represents the treated cells. Each blob is contained within a two-dimensional subspace (plane) of the ambient space, but in general, these are different. 
+To integrate both conditions, we can map the two planes into each other, so that each point from the blue blob is mapped into the orange subspace, and vice versa.
 
 We can implement this procedure in a few lines of R code:
 
@@ -266,7 +284,7 @@ integrated_mat[,sce$stim == "ctrl"] = t(ctrl_pca$rotation) %*% (ctrl_mat - ctrl_
 integrated_mat[,sce$stim == "stim"] = t(ctrl_pca$rotation) %*% (stim_mat - stim_centers)
 ```
 
-We check that our implementation works, by looking at the UMAP of the integrated data. 
+We check how successful we were by looking at a UMAP of the integrated embedding. 
 
 ```{r}
 #| label: fig-manual-umap
