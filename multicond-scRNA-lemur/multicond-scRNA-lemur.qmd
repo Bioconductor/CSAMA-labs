@@ -198,7 +198,7 @@ as_tibble(colData(sce)) |>
 ::: {.callout-note collapse="true"}
 ## Alternative path: Do the preprocessing with Seurat (click to see results)
 
-The following code is based on Seurat's [*Guided Clustering Tutorial*](https://satijalab.org/seurat/archive/v3.0/pbmc3k_tutorial.html).
+The following code is based on the Seurat [*Guided Clustering Tutorial*](https://satijalab.org/seurat/archive/v3.0/pbmc3k_tutorial.html).
 
 ```{r}
 #| label: seurat-preprocessing
@@ -222,15 +222,13 @@ Seurat::DimPlot(seur_obj, reduction = "umap", group.by = "stim")
 ```
 :::
 
-# Data integration
+# A prelude on data integration
 
-When we made @fig-kang-umap, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**.
-
-The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
+When we made @fig-kang-umap, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**. The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
 
 !["Integrated" UMAP.](images/integrated_data_picture.png){#fig-integrated_picture}
 
-There are many approaches to this end. The question is somewhat ill-defined and can be formalized into a mathematical algorithm in many different ways. @luecken2022 benchmarked several approaches. Here, we first show how to do an integration manually, then with `harmony`. Later we will compare both to `LEMUR`.
+There are many approaches to this end. The question is somewhat ill-defined and can be formalized into a mathematical algorithm in many different ways. @luecken2022 benchmarked several approaches. Here, we first show how to do an integration manually, then with `harmony`. Later we will compare both to `lemur`. If you are just interested in using `lemur`
 
 ::: {.callout-note collapse="true"}
 ## Question: In this tutorial we will just look at plots to assess integration success. Why is that suboptimal? How can we do better?
@@ -296,7 +294,6 @@ int_mat_umap = uwot::umap(t(integrated_mat))
 
 as_tibble(colData(sce)) |>
   mutate(umap = int_mat_umap) |>
-  sample_frac() |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
@@ -324,7 +321,6 @@ int_mat_umap2 = uwot::umap(t(integrated_mat2))
 
 as_tibble(colData(sce)) |>
   mutate(umap = int_mat_umap2) |>
-  sample_frac() |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
@@ -367,15 +363,13 @@ Harmony is one popular tool for data integration [@korsunsky2019]. Harmony is re
 #| label: harmony_integration
 #| eval: !expr (! params$skip_execution)
 #| message: false
-packageVersion("harmony")
-# Attention: You need `packageVersion("harmony") >= "1.0.0"` for this to work.
-harm_mat = harmony::RunHarmony(reducedDim(sce, "PCA"), colData(sce), 
-                                 vars_use = c("stim"))
+#| echo: !expr -1
+stopifnot(packageVersion("harmony") >= "1.0.0")
+harm_mat = harmony::RunHarmony(reducedDim(sce, "PCA"), colData(sce), vars_use = c("stim"))
 harm_umap = uwot::umap(harm_mat)
 
 as_tibble(colData(sce)) |>
   mutate(umap = harm_umap) |>
-  sample_frac() |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
@@ -388,11 +382,11 @@ as_tibble(colData(sce)) |>
 ::: {.callout-note collapse="true"}
 ## Challenge: How do you do integration in Seurat?
 
-Seurat's integration method is based on mutual nearest neighbors (MNN) by @haghverdi2018. However, Seurat calls the mutual nearest neighbors _integration anchors_. The main difference is that Seurat uses CCA instead of PCA for dimensionality reduction [@butler2018].
+The integration method of Seurat is based on mutual nearest neighbors (MNN) by @haghverdi2018. However, Seurat calls the mutual nearest neighbors _integration anchors_. The main difference is that Seurat uses canonical correspondence analysis (CCA) instead of principal component analysis (PCA) for dimensionality reduction [@butler2018].
 
 ```{r}
 #| label: fig-seurat_integration
-#| fig-caption: "Seurat's anchor integration"
+#| fig-caption: "Seurat anchor integration"
 #| eval: !expr (! params$skip_execution && ! params$skip_slow_chunks)
 
 # This code only works with Seurat v5!
@@ -444,11 +438,11 @@ In the next sections we discuss these steps in more detail.
 
 Tools like MNN and Harmony take a PCA embedding and remove the effects of the specified covariates. However, there is no way to go back from the integrated embedding to the original gene space. This means that we cannot ask the counterfactual what the expression of a cell from the control condition would have been, had it been treated.
 
-[LEMUR](https://bioconductor.org/packages/lemur/) achieves such counterfactuals by matching the subspaces of each condition [@AhlmannEltze:NatGen:2025]. @fig-subspace_matching illustrates the principle. In some sense this is a more sophisticated version of the manual matching that we saw in the previous section. The matching is a single affine transformation in contrast to Harmony's inferred shifts per cluster.
+[`lemur`](https://bioconductor.org/packages/lemur/) achieves such counterfactuals by matching the subspaces of each condition [@AhlmannEltze:NatGen:2025]. @fig-subspace_matching illustrates the principle. In some sense this is a more sophisticated version of the manual matching that we saw in the previous section. The matching is a single affine transformation in contrast to shifts per cluster inferred by Harmony.
 
 ![Schematic picture of data from two conditions with the respective linear subspace.](images/Subspace_illustration_both_condition_with_arrow.png){#fig-subspace_matching width="40%"}
 
-LEMUR takes as input a `SingleCellExperiment` object, the specification of the experimental design, and the number of latent dimensions. To refine the embedding, we will use the provided cell type annotations.
+`lemur` takes as input a `SingleCellExperiment` object, the specification of the experimental design, and the number of latent dimensions. To refine the embedding, we will use the provided cell type annotations.
 ```{r}
 #| label: fit-lemur-model
 #| eval: !expr (! params$skip_execution)
@@ -458,17 +452,16 @@ fit = lemur(sce, design = ~ stim, n_embedding = 30, verbose = FALSE)
 fit = align_by_grouping(fit, fit$colData$cell, verbose = FALSE)
 ```
 
-Making a UMAP plot of LEMUR's embedding shows that it successfully integrated the conditions (@fig-lemur_umap).
+Making a UMAP plot of the embedding by `lemur` shows that it successfully integrated the conditions (@fig-lemur_umap).
 
 ```{r}
 #| label: fig-lemur_umap
-#| fig-cap: "UMAP plot of LEMUR's embedding."
+#| fig-cap: "UMAP plot of LEMUR embedding."
 #| eval: !expr (! params$skip_execution)
 lemur_umap = uwot::umap(t(fit$embedding))
 
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
-  sample_frac() |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
@@ -481,20 +474,19 @@ We can cross-check our embedding with the provided cell type annotations by colo
 #| eval: !expr (! params$skip_execution)
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
-  sample_frac() |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = cell), size = 0.3) +
     coord_fixed()
 ```
 
 ::: {.callout-note}
-## Challenge: How much do the results change if you change the default parameters in LEMUR?
+## Challenge: How much do the results change if you change the default parameters in `lemur`?
 :::
 
 ::: {.callout-note collapse="true"}
-## Challenge: How to can the embedding of LEMUR be refined with an automated tool?
+## Challenge: How to can the embedding of `lemur` be refined with an automated tool?
 
-If there are no cell type labels present, LEMUR uses a modified version of Harmony's maximum diversity clustering to automatically infer the cell relationships across conditions.
+If there are no cell type labels present, `lemur` uses a modified version of the maximum diversity clustering of `harmony` to automatically infer the cell relationships across conditions.
 
 ```{r}
 #| label: align-lemur-model
@@ -506,11 +498,11 @@ fit2 = align_harmony(fit2, verbose = FALSE)
 
 ## Differential expression analysis (Step 2)
 
-The advantage of LEMUR's integration is that we can predict what a cell's expression from the control condition would have been, had it been stimulated and vice versa. Contrasting those predictions tells us how much the gene expression changes for that cell in any gene.
+The advantage of the `lemur` integration is that we can predict what a cell's expression from the control condition would have been, had it been stimulated and vice versa. Contrasting those predictions tells us how much the gene expression changes for that cell in any gene.
 
 ![Differential expression with an invertible integration can be inferred as the difference between the prediction for a position from one condition and the prediction at the same position in the other condition.](images/differential_expression.png){width="60%"}
 
-We call LEMUR's `test_de` function to compare the expression values in the `"stim"` and `"ctrl"` conditions.
+We call the `test_de` function of `lemur` to compare the expression values in the `"stim"` and `"ctrl"` conditions.
 ```{r}
 #| label: lemur-calc-de
 #| eval: !expr (! params$skip_execution)
@@ -524,12 +516,11 @@ We can now pick an individual gene (_PLSCR1_) and plot the predicted log fold ch
 #| layout-ncol: 2
 #| fig-cap: 
 #|   - "Expression of _PLSCR1_ in control and stim condition"
-#|   - "Counterfactual: LEMUR predicts _PLSCR1_ differential expression between control and stimulus for each cell"
+#|   - "Counterfactual: `lemur` predicts _PLSCR1_ differential expression between control and stimulus for each cell"
 #| eval: !expr (! params$skip_execution)
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
   mutate(expr = logcounts(fit)["PLSCR1",]) |>
-  sample_frac() |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = expr), size = 0.3) +
     scale_color_viridis_c() +
@@ -539,7 +530,6 @@ as_tibble(colData(sce)) |>
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
   mutate(de = assay(fit, "DE")["PLSCR1",]) |>
-  sample_frac() |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
@@ -568,9 +558,9 @@ glm_de |>
 :::
 
 ::: {.callout-note collapse="true"}
-## Challenge: For each cell type compare LEMUR's predictions against the observed expression of a gene:
+## Challenge: For each cell type compare the `lemur` predictions against the observed expression of a gene:
 
-We use the `pseudobulk` function from `glmGamPoi` to calculate the average expression and latent embedding position per condition and cell type. The mean embedding and `colData` is then fed to LEMUR's `predict` function.
+We use the `pseudobulk` function from `glmGamPoi` to calculate the average expression and latent embedding position per condition and cell type. The mean embedding and `colData` is then fed to the `predict` function of `lemur`.
 
 ```{r, paged.print=FALSE}
 #| label: glmGamPoi_vs_lemur2
@@ -588,13 +578,13 @@ as_tibble(colData(reduced_fit)) |>
   ggplot(aes(x = obs, y = lemur_pred)) +
     geom_abline() +
     geom_point(aes(color = stim)) +
-    labs(title = "LEMUR's predictions averaged per cell type and condition")
+    labs(title = "`lemur` predictions averaged per cell type and condition")
 ```
 :::
 
 ## Neighborhood identification (Step 3) and differential expression tests (Step 4)
 
-To help identify the most interesting changes, LEMUR can aggregate the results of each gene and identify the neighborhood of cells with the most prominent gene expression. To conduct a statistically valid differential expression test, LEMUR pseudobulks the counts for each replicate (here this is the patient).
+To help identify the most interesting changes, `lemur` can aggregate the results of each gene and identify the neighborhood of cells with the most prominent gene expression. To conduct a statistically valid differential expression test, `lemur` pseudobulks the counts for each replicate (here this is the patient).
 
 The output is a `data.frame` with one row for each gene. The `neighborhood` column is a list column, where each element is a vector with the IDs of the cells that are inside the neighborhood. The other columns describe the significance of the expression change defined in the `test_de` call.
 
@@ -626,7 +616,6 @@ top_did_gene = slice_min(nei, did_pval)
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   mutate(de = assay(fit, "DE")[top_did_gene$name,]) |>
-  sample_frac() |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
@@ -634,7 +623,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
     labs(title = "Top DE gene by did_pval")
 ```
 
-To see which cells LEMUR included in the neighborhood for each gene, we will first make a smaller helper function:
+To see which cells `lemur` included in the neighborhood for each gene, we will first make a smaller helper function:
 
 ```{r}
 #| label: neighborhoods_to_long_data-helper-function
@@ -662,7 +651,7 @@ neighborhoods_to_long_data = function(data, fit = NULL){
 ```
 
 
-With this function, we can annotate for any gene if a cell is included in LEMUR's neighborhood.
+With this function, we can annotate for any gene if a cell is included in its `lemur` neighborhood.
 
 ```{r, paged.print=FALSE}
 #| label: neighborhood-facetted
@@ -672,20 +661,19 @@ cells_inside_df = neighborhoods_to_long_data(top_did_gene, fit)
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   mutate(de = assay(fit, "DE")[top_did_gene$name,]) |>
-  left_join(cells_inside_df, by = c("cell_name" = "cell")) %>%
-  sample_frac() |>
+  left_join(cells_inside_df, by = c("cell_name" = "cell")) |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed() +
     facet_wrap(vars(inside), labeller = label_both) +
-    labs(title = "Top DE gene by did_pval")
+    labs(title = "Top differentially expressed gene, according to did_pval")
 ```
 
 ::: {.callout-warning collapse="true"}
-## Brain teaser: How are LEMUR's neighborhoods different from the cluster-based differential expression tests?
+## Brain teaser: How are `lemur` neighborhoods different from the cluster-based differential expression tests?
 
-LEMUR's neighborhoods are adaptive to the underlying expression patterns for each gene. This means that they provide optimal power to detect differential expression as well the set of cells for which the gene expression changes most.
+The `lemur` neighborhoods are adaptive to the underlying expression patterns for each gene. This means that they provide optimal power to detect differential expression as well the set of cells for which the gene expression changes most.
 
 The plot below illustrates this for the top three DE genes by `pval` which all have very different neighborhoods. Note that the neighborhoods are convex in the low-dimensional embedding space, even though in the UMAP embedding they might not look like it. This is due to the non-linear nature of the UMAP dimensionality reduction.
 
@@ -698,9 +686,8 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   mutate(de = as_tibble(t(assay(fit, "DE")[slice_min(nei, pval, n = 3)$name,]))) |>
   unpack(de, names_sep = "_") %>%
-  pivot_longer(starts_with("de_"), names_sep = "_", names_to = c(".value", "gene_name")) %>%
-  left_join(cells_inside_df_top3, by = c("gene_name" = "name", "cell_name" = "cell")) %>%
-  sample_frac() |>
+  pivot_longer(starts_with("de_"), names_sep = "_", names_to = c(".value", "gene_name")) |>
+  left_join(cells_inside_df_top3, by = c("gene_name" = "name", "cell_name" = "cell")) |>
   ggplot(aes(x = umap[,1], y = umap[,2])) +
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
@@ -713,7 +700,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 # Outlook
 
-LEMUR can handle arbitrary design matrices as input, which means that it can also handle more complicated experiments than the simple treatment / control comparison shown here. Just as with limma, edgeR or DESeq2, you can model
+`lemur` can handle arbitrary design matrices as input, which means that it can also handle more complicated experiments than the simple treatment / control comparison shown here. Just as with limma, edgeR or DESeq2, you can model
 
 - multiple covariates, e.g., the treatment of interest as well as known confounders (experiment batch, sex, age) or blocking variables,
 - interactions, e.g., drug treatment in wild type and mutant,
