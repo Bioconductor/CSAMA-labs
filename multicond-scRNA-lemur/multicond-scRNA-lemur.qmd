@@ -228,7 +228,7 @@ When we made @fig-kang-umap, we discussed that the cells' embedding locations se
 
 !["Integrated" UMAP.](images/integrated_data_picture.png){#fig-integrated_picture}
 
-There are many approaches to this end. The question is somewhat ill-defined and can be formalized into a mathematical algorithm in many different ways. @luecken2022 benchmarked several approaches. Here, we first show how to do an integration manually, then with `harmony`. Later we will compare both to `lemur`. If you are just interested in using `lemur`
+There are many approaches to this end. The question is somewhat ill-defined and can be formalized into a mathematical algorithm in many different ways. @luecken2022 benchmarked several approaches. Here, we first show how to do an integration manually, then with `harmony`. Later we will compare both to `lemur`. If you are just interested in using `lemur`, you can skip ahead to @sec-analysis-with-lemur.
 
 ::: {.callout-note collapse="true"}
 ## Question: In this tutorial we will just look at plots to assess integration success. Why is that suboptimal? How can we do better?
@@ -403,7 +403,7 @@ Seurat::DimPlot(seur_obj2, reduction = "umap", group.by = "stim")
 ```
 :::
 
-# Analysis with LEMUR
+# Analysis with LEMUR {#sec-analysis-with-lemur}
 
 ![LEMUR workflow](images/lemur_workflow.png){#fig-lemur-workflow width="100%"}
 
@@ -700,7 +700,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 # Outlook
 
-`lemur` can handle arbitrary design matrices as input, which means that it can also handle more complicated experiments than the simple treatment / control comparison shown here. Just as with limma, edgeR or DESeq2, you can model
+`lemur` can handle arbitrary design matrices as input, which means that it can also handle more complicated experiments than the simple treatment / control comparison shown here. Just as with `limma`, `edgeR` or `DESeq2`, you can model
 
 - multiple covariates, e.g., the treatment of interest as well as known confounders (experiment batch, sex, age) or blocking variables,
 - interactions, e.g., drug treatment in wild type and mutant,
