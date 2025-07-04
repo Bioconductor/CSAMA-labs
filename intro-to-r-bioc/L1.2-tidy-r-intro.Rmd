@@ -355,6 +355,8 @@ ggplot(gene_summaries, aes(ave_log_count)) +
     geom_density()
 ```
 
+For a tidy interface to some Bioconductor classes, see the tidyomics [package](https://bioconductor.org/packages/tidyomics/) and [paper](https://www.nature.com/articles/s41592-024-02299-2).
+
 # End matter
 
 ## Session Info
