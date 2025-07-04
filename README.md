@@ -17,17 +17,22 @@ Labs are organized by topic, using only a short identifier
 
 * [Bulk RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/bulk-rnaseq/rnaseqGene_CSAMA2024.html) - `bulk-rnaseq`
 * [Single cell RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/single-cell-rnaseq/singlecell_CSAMA2024.html) - `single-cell-rnaseq`
-* [Advanced single-cell RNA-seq analysis](https://ccb-hms.github.io/osca-workbench/)
-
-### Wednesday
-
+* [Advanced single-cell RNA-seq analysis](https://ccb-hms.github.io/osca-workbench/) `single-cell-rnaseq`
 * [Bulk ATAC-seq analysis](https://bioconductor.github.io/CSAMA-labs/bulk-atacseq/fluent-genomics-v2.html) - `bulk-atacseq`
 
-### Thursday / Friday
+
+
+
+### Thursday
 
 * [Mass spectrometry-based proteomics](https://rformassspectrometry.github.io/book/)
+* [End-to-end metabolomics workflow](https://rformassspectrometry.github.io/Metabonaut/articles/a-end-to-end-untargeted-metabolomics.html)
+* [Multi-condition single cell RNA-seq differential analysis](https://bioconductor.github.io/CSAMA-labs/multicond-scRNA-lemur/multicond-scRNA-lemur-CSAMA2024.html)
+* [Intro to Tidyomics: tidy data analysis applied to omics data](https://tidyomics.github.io/tidy-intro-talk/)
 * [Spatial transcriptomics](https://bioconductor.github.io/CSAMA-labs/spatial-transcriptomics/spatial_CSAMA.html)
+* Trajectory analysis with [slingshot](https://bioconductor.org/packages/devel/bioc/vignettes/slingshot/inst/doc/vignette.html) and [tradeSeq](https://www.bioconductor.org/packages/release/bioc/vignettes/tradeSeq/inst/doc/tradeSeq.html)
 * [Interactive exploration with iSEE](https://csoneson.github.io/isee-lab-csama2025/)
+* [Working with Image Data](https://github.com/wolfganghuber/WorkingWithImageData)
 
 ## Instructors: setting up git pre-commit hooks
 

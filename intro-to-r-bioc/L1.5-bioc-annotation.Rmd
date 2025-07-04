@@ -31,12 +31,14 @@ suppressPackageStartupMessages({
 })
 ```
 
-Original Authors: Martin Morgan, Sonali Arora, Lori Shepherd<br />
-Presenting Author: [Maria Doyle][]</br >
-Date: 23-28 June, 2024</br >
-Back: [Monday labs](lab-1-intro-to-r-bioc.html)
+**Original Authors:** Martin Morgan, Sonali Arora, Lori Shepherd<br />
+**Presenting Author:** [Davide Risso][], [Ilaria Billato][]</br >
+**Date:** 6-11 July, 2025</br >
+**Back:** [Monday labs](lab-1-intro-to-r-bioc.html)
 
-[Maria Doyle]: mailto: maria.doyle@ul.ie
+[Davide Risso]: mailto: davide.risso@unipd.it
+[Ilaria Billato]: mailto: ilaria.billato@phd.unipd.it
+
 
 **Objective**: Learn about _Bioconductor_ resources for gene and
   genome annotation.
