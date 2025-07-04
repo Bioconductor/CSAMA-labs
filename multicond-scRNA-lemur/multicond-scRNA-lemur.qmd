@@ -149,7 +149,7 @@ In this tutorial, we use direct calls to functions in the `ggplot2` package to v
 #| eval: !expr (! params$skip_execution)
 as_tibble(colData(sce)) |>
   mutate(umap = reducedDim(sce, "UMAP")) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) + 
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) + 
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
 ```
@@ -164,7 +164,7 @@ One solution could be to use a `for` loop and filter the data for each patient, 
 #| eval: !expr (! params$skip_execution)
 as_tibble(colData(sce)) |>
   mutate(umap = reducedDim(sce, "UMAP")) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) + geom_point(aes(color = stim), size = 0.3) + coord_fixed() +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) + geom_point(aes(color = stim), size = 0.3) + coord_fixed() +
     facet_wrap(vars(ind), ncol = 4)
 ```
 :::
@@ -189,7 +189,7 @@ centroids = as_tibble(colData(sce)) |>
 # Use `geom_text_repel` to avoid overlapping annotations
 as_tibble(colData(sce)) |>
   mutate(umap = reducedDim(sce, "UMAP")) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = paste(stim, cell)), size = 0.3) +
     ggrepel::geom_text_repel(data = centroids, aes(label = paste(stim, cell))) +
     coord_fixed()
@@ -294,7 +294,7 @@ int_mat_umap = uwot::umap(t(integrated_mat))
 
 as_tibble(colData(sce)) |>
   mutate(umap = int_mat_umap) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
 ```
@@ -321,7 +321,7 @@ int_mat_umap2 = uwot::umap(t(integrated_mat2))
 
 as_tibble(colData(sce)) |>
   mutate(umap = int_mat_umap2) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
 ```
@@ -370,7 +370,7 @@ harm_umap = uwot::umap(harm_mat)
 
 as_tibble(colData(sce)) |>
   mutate(umap = harm_umap) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
 ```
@@ -462,7 +462,7 @@ lemur_umap = uwot::umap(t(fit$embedding))
 
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = stim), size = 0.3) +
     coord_fixed()
 ```
@@ -474,7 +474,7 @@ We can cross-check our embedding with the provided cell type annotations by colo
 #| eval: !expr (! params$skip_execution)
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = cell), size = 0.3) +
     coord_fixed()
 ```
@@ -521,7 +521,7 @@ We can now pick an individual gene (_PLSCR1_) and plot the predicted log fold ch
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
   mutate(expr = logcounts(fit)["PLSCR1",]) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = expr), size = 0.3) +
     scale_color_viridis_c() +
     facet_wrap(vars(stim)) +
@@ -530,13 +530,13 @@ as_tibble(colData(sce)) |>
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
   mutate(de = assay(fit, "DE")["PLSCR1",]) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed()
 ```
 
-This approach has the advantage over the traditional cluster/cell type-based analysis that it can detect smooth differential expression gradients!
+This approach has the advantage over the traditional cluster/cell type-based analysis that it can detect smooth differential expression gradients.
 
 ::: {.callout-note collapse="true"}
 ## Challenge: Calculate the differential expression for each cell type using [glmGamPoi](https://bioconductor.org/packages/release/bioc/vignettes/glmGamPoi/inst/doc/pseudobulk.html).
@@ -616,7 +616,7 @@ top_did_gene = slice_min(nei, did_pval)
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   mutate(de = assay(fit, "DE")[top_did_gene$name,]) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed() +
@@ -662,7 +662,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   mutate(de = assay(fit, "DE")[top_did_gene$name,]) |>
   left_join(cells_inside_df, by = c("cell_name" = "cell")) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed() +
@@ -688,7 +688,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   unpack(de, names_sep = "_") %>%
   pivot_longer(starts_with("de_"), names_sep = "_", names_to = c(".value", "gene_name")) |>
   left_join(cells_inside_df_top3, by = c("gene_name" = "name", "cell_name" = "cell")) |>
-  ggplot(aes(x = umap[,1], y = umap[,2])) +
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed() +
