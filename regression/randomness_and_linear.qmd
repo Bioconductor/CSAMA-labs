@@ -1,0 +1,696 @@
+---
+title: "Randomness and the linear model"
+author: "Michael Love"
+date: "July 6, 2025"
+license: "CC-BY"
+format: 
+  html:
+    toc: true 
+    code-fold: false
+    code-tools: true
+    embed-resources: true
+    highlight-style: github
+    code-line-numbers: false 
+params:
+  skip_execution: false
+  skip_answers: true
+---
+
+```{r}
+#| label: initialize
+#| echo: FALSE
+knitr::opts_chunk$set(echo = TRUE, fig.width=7, fig.height=5) 
+```
+
+## Randomness and estimates
+
+Here we will consider data that follows a linear relationship, for example pairs $x_i, y_i$ arranged in two dimensions such that the $y_i$ are scattered around a linear function of $x_i$. We treat $y_i$ as a random variable to account for the scatter, which we will explore in more detail later. The parameters we estimate from this model are themselves random variables, since they depend on the observed data, including the random $y_i$. Simulation provides a useful way to understand this process by direct observation of how random data leads to random estimates following particular distributions through the mechanism of estimation. The distribution of the estimates can be inferred using math and applied then to data. In the end we can *estimate* the distributions of our estimates.
+
+As is often the case, the stronger we lean on assumptions, the more we can say about distributions of functions of data. However, as John Tukey said, "*better an approximate answer to the right question, which is often vague, than an exact answer to the wrong question*". In the context of linear models, this quote should remind us to understand what we get with a minimal set of assumptions, which in the case of linear models is arguably quite a lot.
+
+**Scope/terminology:** Often when we think of linear regression, we imagine one $x$ and one $y$ variable (here writing them as vectors), but in general a linear model implies using a linear combination of original predictor variables $(x^1, x^2, \dots, x^p)$ or set of transformed predictor variables, to account for variance in a response $y$. We can say then that $y$ falls near a "linear subspace" that may be spanned by a number of vectors $x$. We can refer to the $x$ vectors as predictors, covariates, or features, and the $y$ may be called called the outcome, the observations, or the target, depending on context and field.
+
+## Random data around a line
+
+Let's write down a formula:
+
+$$y = a + b x + \varepsilon$$
+
+the above type of notation will be shorthand, more completely we would say, for all $i \in 1, \dots, n$:
+
+$$
+y_i = a + b x_i + \varepsilon_i
+$$
+
+$\varepsilon_i$ is "extra" beyond the linear relationship. You can hear it referred to as "error" or "epsilon" (the Greek name for the symbol we use). Note that, since we don't know $a$ or $b$ we don't "observe" $\varepsilon_i$ but will have to estimate it.
+
+We will assume $E(\varepsilon_i) = 0$ , $\textrm{Var}(\varepsilon_i) = \sigma^2$ for all $i$, and $\textrm{Cov}(\varepsilon_i, \varepsilon_j) = 0$ for all $i,j$.
+
+::: {.callout-note collapse="false"}
+## Question
+
+What do these three formula each mean?
+:::
+
+We don't need particular distributional assumptions just yet (e.g. the $\varepsilon_i$ are Normally distributed, etc.). We will see we get a lot of useful properties from fitted linear models with just these three assumptions.
+
+Note that the first assumption also implies $E(y) = a + b x$, that the conditional mean of $y$ is linear with $x$.
+
+::: {.callout-note collapse="false"}
+## Question
+
+What does it mean here "extra"? Is it "error", "noise", something else?
+:::
+
+We will start by generating some $x$ variables. In the model above, we didn't talk about $x$ and usually it is assumed to be received/measured *without error*. For the purpose of linear model, these two examples are roughly the same: they have the same looking spread, and variance. The last example has the same variance but different distribution (binary).
+
+For convenience, in this lecture note I will simulate data, and will simulate $x$ often from a Normal or multivariate Normal distribution. This will allow me to create data $x$ with a certain type of variance or covariance. But $y$ is the real random variable that we will study in terms of its randomness.
+
+```{r}
+set.seed(5)
+n <- 1000
+x <- rnorm(n, sd=0.5)
+head(x)
+hist(x)
+var(x)
+x <- qnorm(p=1:n/(n+1), sd=0.5)
+head(x)
+hist(x)
+var(x)
+x <- rep(0:1, length.out=n)
+head(x)
+var(x)
+```
+
+Here we compute some data $y$ and then plot it.
+
+::: {.callout-note collapse="false"}
+## Question
+
+Contrast the two models in terms of the distribution of $y$ around the line. What is a bigger component, the $b \cdot x$ part or the $\varepsilon$ part?
+:::
+
+```{r}
+n <- 20
+extra_sd <- 1
+extra <- rnorm(n, sd=extra_sd)
+a <- 3
+x <- rep(0:1, each=n/2)
+b <- 0
+y <- a + b * x + extra # first model
+plot(x, y)
+extra_sd <- 0.1
+extra <- rnorm(n, sd=extra_sd)
+b <- 2
+y <- a + b * x + extra # second model
+plot(x, y)
+```
+
+::: {.callout-note collapse="false"}
+## Question
+
+We said that $a$ and $b$ are unknown, $x$ is "known". All three are considered "fixed" in the world of our model. None are considered "random". What are the implications of these assumptions?
+:::
+
+In addition to $a$ and $b$, $\varepsilon$ is also not known, and is a random variable. So in terms of estimation, we need to estimate $a, b, \varepsilon$ using data: $x$ and $y$.
+
+## Estimation of the linear coefficients and "extra"
+
+Let's move to the general case where we have more than one $x$, which include the univariate case. We will capitalize to represent the matrix $X$ and change to using `X` in the code. We can use `X %*% b` with matrix `X` and vector `b` to accomplish a linear combinations of the component columns $x^1$ and $x^2$ of $X$.
+
+Convince yourself briefly that this matrix multiplication achieves what we want (maybe draw the matrix and trace the row and columns that will be multiplied).
+
+We will also switch by convention to referring to the vector in code `b` as a vector variable $\beta$. When we refer to an estimate of `b` we will denote that as the random vector $\hat{\beta}$.
+
+::: {.callout-note collapse="false"}
+## Question
+
+Review: why again is $\hat{\beta}$ random, if we said $\beta$ is fixed?
+:::
+
+```{r}
+x1 <- rnorm(n, sd=0.5)
+x2 <- rnorm(n, sd=0.5)
+X <- cbind(x1, x2)
+extra_sd <- 1
+extra <- rnorm(n, sd = extra_sd)
+a <- 3
+b <- c(2, 1)
+y <- a + X %*% b + extra
+# simpler, and equivalent:
+X <- cbind(intercept=rep(41,n), x1, x2)
+b <- c(3, 2, 1)
+y <- X %*% b + extra 
+```
+
+We will use $p$ to denote the number of columns of $X$. Sometimes you will see $p + 1$ for the number of columns of $X$ if the coefficients are counted from $\beta_0, \beta_1, \dots, \beta_p$ with $\beta_0$ as the intercept (e.g. `a` above).
+
+We can show that for linear models with an intercept, there are a number of properties that the solution will have. We will define the term "residual" as the observed $y_i$ minus the predicted value $\hat{y}_i$ ("y-hat"). For models with an intercept, the residuals will sum to 0. This kind of makes sense if you think about it. For models where the $x$'s are "dummy variables" (indicator variables taking values $\{0,1\}$) we will have,
+
+$$
+\hat{\beta}_0 = 1/n_0 \sum_{i:x_i = 0} y_i
+$$
+
+that is, the estimated coefficient for the intercept will be equal to the mean value of the observed outcome when the predictors are all equal to 0. If there's no data point where all $x_i=0$, the intercept becomes an extrapolation to a fitted value where $x_i = 0$, not a literal average of some subset of the data $y$.
+
+Below I will explore multiple ways that we go about estimating $\beta$. Luckily they all give us the same answer! Then we will use these derivations to make some statements about our estimates of things like $\beta$ and $\sigma^2$.
+
+### Finding solution with calculus
+
+We want to find $\hat{\beta}$, $\hat{\sigma}^2$ that are optimal in some sense. One criterion is to minimize the squared residuals, i.e. differences from observed $y$ to predicted $\hat{y}$ ("least squares" or sometimes "ordinary least squares", OLS).
+
+We compute the *residuals*:
+
+$$
+\hat{\varepsilon}_i = y_i - \hat{y}_i
+$$
+
+Below I will write $\hat{\varepsilon}$ as the *vector* of residuals for all $n$ observations.
+
+::: {.callout-note collapse="false"}
+## Question
+
+Why consider square of the residuals? What are squares good for in calculus, and what do they correspond to in geometry? Why is this a good idea, and why maybe a bad idea?
+:::
+
+Total squared distance/error of prediction, also called the residual sum of squares, can be computed and simplified into terms involving $\hat{\beta}$. Note here we refer to *vectors* $\varepsilon, y, \hat{y}, \hat{\beta}$ and matrix $X$.
+
+$$
+\begin{align}
+\hat{\varepsilon}' \hat{\varepsilon} &= (y-\hat{y})'(y-\hat{y}) \\
+&= (y-X \hat{\beta})'(y-X \hat{\beta}) \\
+&= y' y - 2 \hat{\beta}' X' y + \hat{\beta}' X' X \hat{\beta}
+\end{align}
+$$
+
+Taking derivatives with respect to (vector) $\hat{\beta}$ and setting equal to 0
+
+$$
+0 = -2X'y + 2X'X \hat{\beta}
+$$
+
+This gives the "normal equations" (here shown with dimensions as subscripts). This refers to "normal" as in orthogonal, *not* meaning "distributed as a Normal/Gaussian".
+
+$$
+(X'X)_{p \times p} ~ \hat{\beta}_{p \times 1}=X'_{p \times n} ~y_{n \times 1} 
+$$
+
+$\hat{{\beta}}$ that solves the normal equations gives us $\hat{y} = X \hat{{\beta}}$ and residuals $\hat{\varepsilon}$ such that
+
+$$
+\hat{y}' \hat{\varepsilon} = 0
+$$
+
+The predicted values and residuals are orthogonal. We will investigate this further in the next section.
+
+::: {.callout-note collapse="false"}
+## Question
+
+Does this make sense? What if the predicted values and residuals were correlated? E.g. imagine whenever predicted $\hat{y}$ is positive, the residual is positive, and whenever predicted $\hat{y}$ is negative the residual is negative.
+:::
+
+### Geometric intuition of the normal equations
+
+We seek $\hat{\beta}$ such that $\hat{y} = X \hat{\beta}$ is closest in Euclidean distance to $y$ (least squares).
+
+We usually think about our data as $n$ data points in $p$ dimensional space e.g. we plot $y$ over one column of $X$, etc. Instead, for this intuition about the normal equations, we have to re-arrange our point of view to thinking about $y$ and $\hat{y}$ in $n$ dimensional space, $\mathcal{R}^n$.
+
+Think of $\hat{y} = X \hat{\beta}$ as an $n$-dimensional vector that lies in the column space of $X$, written $C(X)$. This is hard for us to visualize when $n > 3$...
+
+$\hat{y}$, being a linear combination of columns of X, must live in $C(X)$. We want to find the point in $C(x)$ that is closest (minimizing the distance, i.e. the squared residuals), to $y$.
+
+Consider the residual vector, $\hat{\varepsilon} = y - \hat{y}$. In a 3D diagram below (as we can only visualize up to $n = 3$), the residual vector $\hat{\varepsilon}$ is drawn as an orange segment from red $y$ to blue $\hat{y}$. Another way to phrase the goal of finding the closest point, is that we want the residual vector to be *orthogonal* to $C(X)$.
+
+We can write this requirement in math as:
+
+$$
+\begin{align}
+X' \hat{\varepsilon} &= \textbf{0} \\
+X' (y - \hat{y}) &= \textbf{0} \\
+X' (y - X \hat{\beta}) &= \textbf{0} \\
+X' y - X' X \hat{\beta} &= \textbf{0} \\
+X' y &= X' X \hat{\beta}
+\end{align}
+$$
+
+which is the same system of linear equations we also found via calculus.
+
+The matrix that projects $y$ to $\hat{y}$ in $C(X)$ is called $P$, the projection matrix.
+
+Looking at the above, we can recognize that the projection matrix is defined by
+
+$$
+P = X (X' X)^{-1} X'
+$$
+
+which is perhaps familiar from linear algebra as the matrix which projects any vector $v$ onto the linear subspace spanned by the columns of $X$.
+
+::: {.callout-note collapse="false"}
+## Question
+
+In fact the residuals $\hat{\varepsilon}$ are orthogonal to the column space of $X$, $C(X)$. Does this make sense? What if residuals were correlated with one of the columns of $X$?
+:::
+
+### 3D interpretation of normal equations
+
+```{r}
+#| eval: false
+# the following 'rgl' ncode is provided with comment...
+# used only to make a 3D plot of the normal equations
+library(rgl)
+y3d <- c(0,2,3)
+X3d <- cbind(c(3,0,2),c(2,-3,1))
+P <- X3d %*% solve(t(X3d) %*% X3d) %*% t(X3d)
+yhat3d <- as.vector( P %*% y3d )
+open3d()
+bg3d(color = "white")
+plot3d(
+  y3d,
+  xlim=c(-5,5), ylim=c(-5,5), zlim=c(-5,5),
+  xlab="", ylab="", zlab=""
+)
+axes3d(labels = NULL)
+normal <- pracma::cross(X3d[,1], X3d[,2])
+planes3d(
+  a = normal[1], b = normal[2], c = normal[3], 
+  alpha = 0.5, col = "dodgerblue"
+)
+segments3d(rbind(c(0,0,0), X3d[,1]), col = "dodgerblue", lwd = 2)
+segments3d(rbind(c(0,0,0), X3d[,2]), col = "dodgerblue", lwd = 2)
+points3d(y3d, col = "red", size = 10)
+points3d(yhat3d, col = "blue", size = 10)
+segments3d(rbind(y3d, yhat3d), col = "orange", lwd = 2)
+text3d(y3d, texts = "y", pos = 3, col = "red")
+text3d(yhat3d, texts = "ŷ", pos = 3, col = "blue")
+text3d(X3d[,1], texts = "x1", pos = 3, col = "dodgerblue")
+text3d(X3d[,2], texts = "x2", pos = 3, col = "dodgerblue")
+```
+
+## Estimating the variance of "extra"
+
+We will estimate the variance of the "extra" part of our data, $\textrm{Var}(\varepsilon_i) = \sigma^2$, with $\hat{\sigma}^2 = \frac{1}{(n-p)} \sum_i^{n} \hat{\varepsilon}_i$. The $n-p$ is familiar from the typical estimate of the sample variance, which takes into the "degree of freedom" that was used in estimating the mean.
+
+::: {.callout-note collapse="false"}
+## Question
+
+It can be shown that $\textrm{Var}(\hat{\varepsilon}_i) = \sigma^2 (1 - h_i)$ with $h_i$ called the "hat value", equal to the i-th diagonal of the projection matrix $P$. This is not constant across observations $i$. Does this make intuitive sense, that while the $\varepsilon$ are assumed constant variance, the residuals are not? Note also that residuals are not independent while $\varepsilon$ are.
+:::
+
+## Properties of the OLS solution
+
+The following are useful properties of our OLS solution $\hat{\beta}$:
+
+-   It is unbiased, that is $E(\hat{\beta}) = \beta$. This is true if the linear model is correct as specified.
+
+-   It is consistent, meaning that $\hat{\beta}$ *converges in probability* to the true $\beta$. Convergence in probability in this context means that, as the sample size increases, the probability that the estimate will be any specified distance from the true value goes to zero.
+
+-   It is "efficient", meaning it has the smallest variance of all unbiased estimators that are linear functions of the data. This is a result of the Gauss-Markov theorem, which has a good Wikipedia page with a proof of this result that you can consult. Briefly the steps are:
+
+    1.  Take expectation of a linear estimator, and use unbiased property.
+    2.  Take variance of a linear estimator using result from (1)
+
+    If we add the assumption that $\varepsilon_i \sim N(0, \sigma^2)$ then we have that the OLS solution is the most efficient of *all* unbiased estimators.
+
+-   The sampling distribution of $\hat{\beta}$ is approximately multivariate Normal, with approximation better with large samples. With $\varepsilon_i \sim N(0, \sigma^2)$ then the sampling distribution is exactly multivariate Normal.
+
+-   If we add the assumption $\varepsilon_i \sim N(0, \sigma^2)$ then we can construct small-sample tests with the correct distribution (our statistics of interest will follow Student's $t$ distribution).
+
+## Sampling variability of the OLS estimate
+
+We can derive the sample *covariance matrix* for $\hat{\beta}$.
+
+::: {.callout-note collapse="false"}
+## Question
+
+What is a sample covariance, when you have a random vector $v$? Think about what this means about the elements of the vector
+:::
+
+$$
+\textrm{Cov}(\hat{\beta}) = \sigma^2 (X' X)^{-1}
+$$
+
+How does this look with uncorrelated predictors?
+
+If we have columns of $X$, say $x^1$ and $x^2$ with correlation of 0, then their off-diagonal elements of $(X' X)^{-1}$ will also be 0. Hence their corresponding estimated coefficients *will not be correlated*. It helps to think about this in terms of these parameters being *unlinked* when trying to predict $y$.
+
+The sampling variability of elements of $\hat{\beta}$ will depend mostly on $n$ and the variance of the corresponding column of $X$. In fact it is the product of these terms (using the biased variance estimate).
+
+I will now make a function that will simulate the process of making data $y$ and estimating $\beta$. By simulating the same model many times, we can observe the sampling distribution of various parameters of interset.
+
+```{r}
+set.seed(5)
+# define a function to get estimates of beta:
+simulate_estimating_betas <- \(n, nreps) {
+  x1 <- rep(0:1, each=n/2)
+  x2 <- rep(0:1, times=n/2)
+  X <- cbind(intercept=rep(1,n), x1, x2) # no correlation
+  b <- c(3, 2, 1)
+  extra_sd <- 1
+  # precomputed objects (same for all sims)
+  X_times_b <- X %*% b
+  Xt_X_inv_Xt <- solve(t(X) %*% X) %*% t(X)
+  replicate(nreps, {
+    extra <- rnorm(n, sd = extra_sd)
+    y <- X_times_b + extra
+    b_hat <- Xt_X_inv_Xt %*% y
+    as.vector(b_hat) # return the OLS solution
+  })
+}
+```
+
+Now that we defined `simulate_estimating_betas()`, we can run the simulation, say 1,000 times. We will obtain a `list` of solutions, where the list is defined over sample size $n$ of the data. The point is to show how the distribution of $\hat{\beta}$ depends on $n$.
+
+```{r}
+set.seed(5)
+n_values <- c(16, 40, 100, 500, 1000)
+nreps <- 1000
+est_betas <- lapply(
+  n_values,
+  simulate_estimating_betas,
+  nreps=nreps
+)
+```
+
+Extract just $\hat{\beta}_1$ from the list, and make a boxplot.
+
+::: {.callout-note collapse="false"}
+## Question
+
+What two things do you note in this plot?
+:::
+
+```{r}
+est_beta1 <- lapply(est_betas, \(b) b[2,])
+names(est_beta1) <- paste0("n=", n_values)
+boxplot(est_beta1)
+```
+
+If we compute the *variance* of these $\hat{\beta}_1$, we can compare the observed variance to the theoretical computation. Seems like it fits. This is what we can expect based on the variance of $x_1$ and the fact that the $x$'s are not correlated.
+
+```{r}
+(var_of_betas <- sapply(est_beta1, var))
+plot(n_values, var_of_betas, type="b", log="xy")
+# theoretical variance:
+points(n_values, 4/n_values, type="b", col="blue")
+```
+
+We see that the estimates $\hat{\beta}_1$ and $\hat{\beta}_2$ are not correlated:
+
+```{r}
+cor_beta1_beta2 <- sapply(est_betas, \(b) cor(t(b))[2,3])
+plot(cor_beta1_beta2, ylim=c(-1,1))
+```
+
+How does this look with correlated predictors? Let's redefine our simulation function to now have an arbitrary correlation $\rho$.
+
+(Technical note: the $x$'s in this simulation are drawn from a distribution so will not have *exactly* $\rho$ as their correlation. Hence, we will save the *actual* correlation per simulation for exact computation of downstream distributions.)
+
+```{r}
+library(mvtnorm)
+simulate_estimating_betas_corX <- \(rho, nreps, n = 100) {
+  replicate(nreps, {
+    X <- mvtnorm::rmvnorm(n, 
+      mean = c(0,0),
+      sigma = cbind(c(1,rho),c(rho,1))
+    )
+    b <- c(2, 1)
+    extra_sd <- 1
+    X_times_b <- X %*% b
+    Xt_X_inv <- solve(t(X) %*% X)
+    extra <- rnorm(n, sd = extra_sd)
+    y <- X_times_b + extra
+    b_hat <- Xt_X_inv %*% t(X) %*% y
+    # return observed correlation, beta solution, 
+    # and all the elements of the matrix (X'X)^-1
+    c(cor(X)[1,2], as.vector(b_hat), as.vector(Xt_X_inv))
+  })
+}
+```
+
+Now we use our new simulation function, over a grid of $\rho$. Remember we save a vector of information about each simulation.
+
+```{r}
+set.seed(5)
+rho_values <- c(0, .25, .5, .75, .95, .99)
+nreps <- 1000
+est_cor_and_betas <- lapply(
+  rho_values,
+  simulate_estimating_betas_corX,
+  nreps=nreps
+)
+```
+
+Start by pulling out the observed correlation between $x_1$ and $x_2$, did it match what we were attempting to simulate?
+
+```{r}
+sample_cor <- lapply(est_cor_and_betas, \(x) x[1,])
+names(sample_cor) <- paste0("r=", rho_values)
+boxplot(sample_cor)
+abline(h=rho_values, col=rgb(0,0,0,.3))
+```
+
+How does the distribution of $\hat{\beta}_1$ look?
+
+```{r}
+est_beta1 <- lapply(est_cor_and_betas, \(x) x[2,])
+names(est_beta1) <- paste0("r=", rho_values)
+boxplot(est_beta1)
+```
+
+We compare the variance of $\hat{\beta}_1$ to the theoretical value, using the first diagonal element of $(X'X)^{-1}$. We use the average value across all simulations.
+
+We include $\sigma^2 = 1$ as well, which we normally do not know exactly, but we do in this simulation.
+
+```{r}
+var_beta1 <- sapply(est_cor_and_betas, \(x) var(x[2,]))
+XtXinv_11 <- sapply(est_cor_and_betas, \(x) mean(x[4,]))
+XtXinv_22 <- sapply(est_cor_and_betas, \(x) mean(x[7,]))
+plot(rho_values, var_beta1)
+# theoretical variance:
+points(rho_values, extra_sd^2 * XtXinv_11, col="blue")
+```
+
+Now examine the correlation of $\hat{\beta}_1$ and $\hat{\beta}_2$, and compare to the theoretical formula. Again we use the average of the off-diagonal of $(X'X)^{-1}$ across all simulations for plotting:
+
+```{r}
+cor_beta1_beta2 <- sapply(est_cor_and_betas, \(x) cor(t(x))[2, 3])
+XtXinv_12 <- sapply(est_cor_and_betas, \(x) mean(x[5, ]))
+plot(rho_values, cor_beta1_beta2)
+points(
+  rho_values,
+  XtXinv_12 / sqrt(XtXinv_11 * XtXinv_22),
+  col = "blue"
+)
+```
+
+::: {.callout-note collapse="false"}
+## Question
+
+What do these last two results tell us about *design* of experiments and power to detect variance explained in $y$ by columns of $X$?
+:::
+
+## Analysis of Variance (ANOVA)
+
+Does $X$ "explain" more variance in $y$ than we expect by chance?
+
+In simple terms, we can look at the increase in the sample variance in $\hat{y}$ compared to the sample variance of $y$. The ratio of these variances is called $R^2$ and is often used to evaluate how well a model explains the data. This is the basis of many statistical tests.
+
+One caution is that $R^2$ is always increasing with additional columns of $X$. To get around this concern, we can either:
+
+-   Use a test set to evaluate $R^2$ to know if our model generalizes well
+-   Perform statistical tests which take into account how many columns of $X$ we used to explain variance in $y$.
+
+The latter option is usually performed via t-test for one column of $X$ at a time, or F-test in general.
+
+## Extra variance
+
+When we look at the residuals, really this is just extra variance. It's misleading to call it "error" or "noise" although these are the common ways to refer to $\hat{\varepsilon}_i$. Residuals are beyond what we could explain with a linear function of $X$. Remember this represents the vector $\hat{\varepsilon}$ in the previous diagram from the point $y \in \mathcal{R}^n$ to the closest point $\hat{y} \in C(X)$ lying in the column span of $X$.
+
+Let's consider two cases where the sources of extra variance are not well described as "error" or "noise": the first will be when we leave out a relevant predictor, and the second when the slope is not constant across observations.
+
+We will switch from here on from the manual matrix computation of estimates to using R's built in linear model function `lm()`. We will use the *broom* package to tidy up summary statistics from the linear model.
+
+We create some simulate data with two uncorrelated $x$'s and an intercept:
+
+```{r}
+set.seed(5)
+n <- 100
+x1 <- rnorm(n, sd=0.5)
+x2 <- rnorm(n, sd=0.5)
+X <- cbind(intercept=rep(1,n), x1, x2)
+b <- c(5, 2, 2)
+extra_sd <- 1
+extra <- rnorm(n, sd=extra_sd)
+y <- X %*% b + extra 
+fit <- lm(y ~ 1 + x1 + x2)
+library(broom)
+tidy(fit) # the (X'X)-1 X'y estimates and s.e.
+glance(fit) # more statistics
+```
+
+### 1. Effect of a missing predictor
+
+A seemingly simple situation: what if we leave out a predictor that explains variance in $y$?
+
+Another way to think about this, is that the "extra" is no longer drawn as independent values $\varepsilon_i$, with constant variance and expectation 0. Many times in experimental contexts we end up with errors which are not independent but *correlated*.
+
+In high dimensional data such as we encounter in genomics, we may have correlations of errors that exhibit a shared structure across many features (e.g. genes). In genomics, this is referred to as batch effects. For example, the counts of reads for a feature could be higher or lower in a coordinated way among sets of samples that predicted by $E(y|X)$, perhaps due to experimental factors in common to these samples and not to the other samples.
+
+::: {.callout-note collapse="false"}
+## Question
+
+If the correlation structure of the errors is shared across many genes, what strategies could we use to estimate it?
+:::
+
+Below we take a look at how leaving out a predictor affects estimation, by keeping in $x^1$ but leaving out $x^2$. This is called a mis-specified model, because $\varepsilon$ is not distributed identically anymore. We will observe particular errors based on the missing value of $x_2$ and the value of $\beta_2$. This will have consequences on estimating $\beta_1$ in terms of power (directly related to the sampling variance of estimator) and accuracy (i.e. bias of estimator).
+
+```{r}
+fit_mis <- lm(y ~ 1 + x1)
+tidy(fit_mis) 
+glance(fit_mis)["sigma"]
+```
+
+::: {.callout-note collapse="false"}
+## Question
+
+Why did the standard errors increase for the intercept and x1 coefficient? Do you think the estimates are biased?
+:::
+
+Let's consider another case where x1 and x2 are correlated, and we leave $x^2$ out of the model for estimation.
+
+```{r}
+rho <- .7
+X0 <- mvtnorm::rmvnorm(
+  n, mean = c(0,0), 
+  sigma = cbind(c(1,rho),c(rho,1))
+)
+x1 <- X0[,1]
+x2 <- X0[,2]
+X <- cbind(intercept=rep(1,n), x1, x2)
+b <- c(5, 2, 2)
+extra_sd <- 1
+extra <- rnorm(n, sd = extra_sd)
+y <- X %*% b + extra
+```
+
+The second `lm` model below is a mis-specified model. Note how far the true value is from the confidence interval!
+
+```{r}
+fit <- lm(y ~ 1 + x1 + x2)
+tidy(fit)
+fit_mis <- lm(y ~ 1 + x1)
+tidy(fit_mis)
+confint(fit_mis)
+```
+
+One can derive that this second estimator for the slope associated with $x^1$, $\hat{\beta}_1^{mis}$, will be biased by the amount $\rho \beta_2$. So the higher the correlation and the larger the true effect of $\beta_2$, the worse the bias will be.
+
+::: {.callout-note collapse="false"}
+## Question
+
+What does this tell you about how to carry out experimental design and analysis?
+:::
+
+### 2. Conditional effects
+
+A more complex situation: what if the $\beta$ are not fixed and equal for all observations?
+
+One situation that this may arise is if there are groups of samples which have a different value of $\beta$. It helps to extend from the idea of a single, fixed $\beta$ to the idea of a $\beta$ that is conditional on other either known or unknown variables, say $Z$.
+
+For a simple examination of what happens in this case, suppose we have three groups of observations:
+
+```{r}
+set.seed(5)
+n <- 120
+x <- runif(n, 0, 5)
+z <- rep(0:2, each = n / 3)
+X <- cbind(
+  intercept = rep(1, n),
+  slope0 = x * (z == 0),
+  slope1 = x * (z == 1),
+  slope2 = x * (z == 2)
+)
+b <- c(5, 0, 1, 3) # different slopes
+extra_sd <- 1
+extra <- rnorm(n, sd = extra_sd)
+y <- X %*% b + extra
+```
+
+Again, just note that the variance of "extra" is mis-estimated (biased upwards again).
+
+```{r}
+fit_mis <- lm(y ~ 1 + x)
+glance(fit_mis)["sigma"]
+```
+
+```{r}
+library(ggplot2)
+group <- factor(z)
+data.frame(y, x, group) |>
+  ggplot(aes(x, y, color=group)) + 
+  geom_point() + 
+  stat_smooth(method="lm", se=FALSE)
+```
+
+We estimate a slope which averages over the three true slopes:
+
+```{r}
+tidy(fit_mis) 
+mean(b[-1])
+```
+
+It is helpful to introduce new concepts of *conditional effects*, as opposed to average effects. We can also introduce the idea of an effect for each observation! This involves allowing for *counterfactual* outcomes, which is a topic in causal inference. Once we have defined outcomes that would have occurred if observations had counterfactual values for covariates $x$, we can talk about things to estimate (called "estimands") such as the average treatment effect (ATE), the conditional average treatment effect (CATE). For more on this topic, check out this book (available online for free):
+
+[Hernán MA, Robins JM (2020). Causal Inference: What If. Boca Raton: Chapman & Hall/CRC](https://miguelhernan.org/whatifbook)
+
+But without introducing new concepts, we can estimate slopes for each group with an *interaction term*:
+
+```{r}
+fit <- lm(y ~ 1 + group:x)
+tidy(fit) 
+glance(fit)["sigma"]
+```
+
+For more on exploring how interaction terms affect linear models, check out the *ExploreModelMatrix* R package.
+
+## What about wiggliness?
+
+Can we still use linear model? Yes!
+
+There are a number of choices in R. You can specify polynomials (ideally with an orthogonal basis), or semi-parametric smooth curves using the splines package. Luckily, there are basis vectors which allow us to fit smoothing splines using the same linear model solution (OLS) described above. The same analysis of variance can be used.
+
+## Bootstrap to estimate variability of estimates
+
+Besides our formula above for estimating sampling variability of various quantities, which all relied on $\hat{\sigma}^2$, we can also use bootstrapping to estimate variances in linear models. Bootstrapping is a resampling data analysis method where we repeatedly sample new data of the same size (same $n$) from the observed data (so, with replacement) to approximate the variability of an estimator. Let's show an example, and compare the standard estimators to bootstrap estimators.
+
+```{r}
+set.seed(5)
+n <- 100
+x1 <- rnorm(n, sd=0.5)
+x2 <- rnorm(n, sd=0.5)
+X <- cbind(intercept=rep(1,n), x1, x2)
+b <- c(5, 2, 2)
+extra <- rt(n, df=2) # more extreme tails
+y <- X %*% b + extra 
+```
+
+I recommend to read `?Boot` for the function from the *car* package, which describes bootstrapping for regression models. Here we just run the bootstrap function to compare the results. We resample the residuals to create new data, re-estimate parameters, and consider the distribution of many such estimates. Note there are two choices for `method`:
+
+> The case bootstrap resamples from the joint distribution of the terms in the model and the response. The residual bootstrap fixes the fitted values from the original data, and creates bootstraps by adding a bootstrap sample of the residuals to the fitted values to get a bootstrap response.
+
+```{r}
+library(car)
+fit <- lm(y ~ 1 + x1 + x2)
+summary(fit)$coef
+set.seed(5)
+bfit <- Boot(fit, method="residual")
+summary(bfit)
+confint(fit)
+Confint(bfit)[,-1]
+```
+
+## Session info
+
+```{r}
+sessionInfo()
+```
