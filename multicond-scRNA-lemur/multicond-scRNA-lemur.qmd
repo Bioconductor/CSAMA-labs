@@ -442,7 +442,8 @@ Tools like MNN and Harmony take a PCA embedding and remove the effects of the sp
 
 ![Schematic picture of data from two conditions with the respective linear subspace.](images/Subspace_illustration_both_condition_with_arrow.png){#fig-subspace_matching width="40%"}
 
-`lemur` takes as input a `SingleCellExperiment` object, the specification of the experimental design, and the number of latent dimensions. To refine the embedding, we will use the provided cell type annotations.
+`lemur` takes as input a `SingleCellExperiment` object, the specification of the experimental design, and the number of latent dimensions. To refine the embedding, we call `align_by_grouping` and tell it to use the provided cell type annotations.
+
 ```{r}
 #| label: fit-lemur-model
 #| eval: !expr (! params$skip_execution)
@@ -463,8 +464,7 @@ lemur_umap = uwot::umap(t(fit$embedding))
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = stim), size = 0.3) +
-    coord_fixed()
+    geom_point(aes(color = stim), size = 0.3) + coord_fixed()
 ```
 
 We can cross-check our embedding with the provided cell type annotations by coloring each cell by cell type (using the information stored in the `colData(sce)$cell` column).
@@ -475,8 +475,7 @@ We can cross-check our embedding with the provided cell type annotations by colo
 as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = cell), size = 0.3) +
-    coord_fixed()
+    geom_point(aes(color = cell), size = 0.3) + coord_fixed()
 ```
 
 ::: {.callout-note}
@@ -498,7 +497,7 @@ fit2 = align_harmony(fit2, verbose = FALSE)
 
 ## Differential expression analysis (Step 2)
 
-The advantage of the `lemur` integration is that we can predict what a cell's expression from the control condition would have been, had it been stimulated and vice versa. Contrasting those predictions tells us how much the gene expression changes for that cell in any gene.
+The advantage of the `lemur` integration is that we can predict what the expression profile of a cell from the control condition would have been, had it been stimulated, and vice versa. Contrasting those predictions tells us how much the gene expression changes for that cell in any gene.
 
 ![Differential expression with an invertible integration can be inferred as the difference between the prediction for a position from one condition and the prediction at the same position in the other condition.](images/differential_expression.png){width="60%"}
 
@@ -584,7 +583,7 @@ as_tibble(colData(reduced_fit)) |>
 
 ## Neighborhood identification (Step 3) and differential expression tests (Step 4)
 
-To help identify the most interesting changes, `lemur` can aggregate the results of each gene and identify the neighborhood of cells with the most prominent gene expression. To conduct a statistically valid differential expression test, `lemur` pseudobulks the counts for each replicate (here this is the patient).
+To help identify the most interesting changes, `lemur` can aggregate the results of each gene and identify the neighborhood of cells with the most prominent coherent pattern of differential gene expression. To conduct a statistically valid differential expression test, `lemur` pseudobulks the counts for each replicate (here this is the patient).
 
 The output is a `data.frame` with one row for each gene. The `neighborhood` column is a list column, where each element is a vector with the IDs of the cells that are inside the neighborhood. The other columns describe the significance of the expression change defined in the `test_de` call.
 
@@ -623,12 +622,14 @@ as_tibble(colData(sce), rownames = "cell_name") |>
     labs(title = "Top DE gene by did_pval")
 ```
 
+As you can see in the above plot, there is strong differential expression of this gene in one cluster of cells, and essentially none in the other cells.
+
 To see which cells `lemur` included in the neighborhood for each gene, we will first make a smaller helper function:
 
 ```{r}
-#| label: neighborhoods_to_long_data-helper-function
+#| label: neighborhoods_to_long_dataframe-helper-function
 #| eval: !expr (! params$skip_execution)
-neighborhoods_to_long_data = function(data, fit = NULL){
+neighborhoods_to_long_dataframe = function(data, fit = NULL){
   nei = data[["neighborhood"]]
   gene_names = data[["name"]]
   cell_names = if(! is.null(fit)) colnames(fit) else unique(unlist(nei))
@@ -656,7 +657,7 @@ With this function, we can annotate for any gene if a cell is included in its `l
 ```{r, paged.print=FALSE}
 #| label: neighborhood-facetted
 #| eval: !expr (! params$skip_execution)
-cells_inside_df = neighborhoods_to_long_data(top_did_gene, fit)
+cells_inside_df = neighborhoods_to_long_dataframe(top_did_gene, fit)
 
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
@@ -680,7 +681,7 @@ The plot below illustrates this for the top three DE genes by `pval` which all h
 ```{r, paged.print=FALSE}
 #| label: neighborhood-facetted-top3
 #| eval: !expr (! params$skip_execution)
-cells_inside_df_top3 = neighborhoods_to_long_data(slice_min(nei, pval, n = 3), fit)
+cells_inside_df_top3 = neighborhoods_to_long_dataframe(slice_min(nei, pval, n = 3), fit)
 
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
