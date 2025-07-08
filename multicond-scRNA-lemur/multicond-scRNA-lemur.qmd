@@ -624,7 +624,13 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 As you can see in the above plot, there is strong differential expression of this gene in one cluster of cells, and essentially none in the other cells.
 
-To see which cells `lemur` included in the neighborhood for each gene, we will first make a smaller helper function:
+To see which cells `lemur` included in the neighborhood for each gene, we will first define a small helper function that converts the `nei` dataframe--which contains one row per gene, and the neighbourhood of that gene as a vector of cell identifiers in the `neighborhood` columns--into another dataframe that has one row for each gene and for each cell, and column `inside` with a logical variable that indicates whether this cell is in the neighbourhood for that gene.
+
+::: {.column-margin}
+
+Future versions of `lemur` may contain this function inside, so you dont need to worry about it.
+
+:::
 
 ```{r}
 #| label: neighborhoods_to_long_dataframe-helper-function-1
