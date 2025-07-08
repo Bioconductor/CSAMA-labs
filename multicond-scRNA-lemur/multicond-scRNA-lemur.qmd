@@ -619,17 +619,24 @@ as_tibble(colData(sce), rownames = "cell_name") |>
     geom_point(aes(color = de), size = 0.3) +
     scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed() +
-    labs(title = "Top DE gene by did_pval")
+    labs(title = "Top differentially expressed gene, by did_pval")
 ```
 
 As you can see in the above plot, there is strong differential expression of this gene in one cluster of cells, and essentially none in the other cells.
 
-To see which cells `lemur` included in the neighborhood for each gene, we will first make a smaller helper function:
+To see which cells `lemur` included in the neighborhood for each gene, we will first define a small helper function that converts the `nei` dataframe--which contains one row per gene, and the neighbourhood of that gene as a vector of cell identifiers in the `neighborhood` columns--into another dataframe that has one row for each gene and for each cell, and column `inside` with a logical variable that indicates whether this cell is in the neighbourhood for that gene.
+
+::: {.column-margin}
+
+Future versions of `lemur` may contain this function inside, so you dont need to worry about it.
+
+:::
 
 ```{r}
-#| label: neighborhoods_to_long_dataframe-helper-function
+#| label: neighborhoods_to_long_dataframe-helper-function-1
 #| eval: !expr (! params$skip_execution)
-neighborhoods_to_long_dataframe = function(data, fit = NULL){
+#| echo: false
+neighborhoods_to_long_dataframe_old = function(data, fit = NULL){
   nei = data[["neighborhood"]]
   gene_names = data[["name"]]
   cell_names = if(! is.null(fit)) colnames(fit) else unique(unlist(nei))
@@ -651,6 +658,42 @@ neighborhoods_to_long_dataframe = function(data, fit = NULL){
 }
 ```
 
+```{r}
+#| label: neighborhoods_to_long_dataframe-helper-function-2
+#| eval: !expr (! params$skip_execution)
+neighborhoods_to_long_dataframe = function(x, fit) {
+  nei = x[["neighborhood"]] 
+  gene_names = x[["name"]]
+  cell_names = unique(unlist(nei))  
+  if (!missing(fit)) cell_names = union(cell_names, colnames(fit))
+  stopifnot(!is.null(nei), !is.null(gene_names), !is.null(cell_names))
+  
+  res = matrix(FALSE, nrow = length(cell_names), ncol = length(gene_names),
+               dimnames = list(cell = cell_names, name = gene_names))
+  for (i in seq_along(gene_names))
+    res[nei[[i]], gene_names[i]] = TRUE
+  
+  as.data.frame.table(res, responseName = "inside", stringsAsFactors = FALSE) |> as_tibble()
+}
+```
+
+```{r}
+#| label: neighborhoods_to_long_dataframe-helper-function-3
+#| eval: !expr (! params$skip_execution)
+#| echo: false
+.testdata = slice_min(nei, pval, n = 27)
+.res1 = neighborhoods_to_long_dataframe_old(.testdata, fit)
+.res2 = neighborhoods_to_long_dataframe(    .testdata, fit) 
+stopifnot(
+  setequal(colnames(.res1), colnames(.res2)), 
+  nrow(.res1) == nrow(.res2),
+  # need to do it like this since rows come in different order...
+  identical(
+    sort(with(.res1, paste(name, cell, inside))), 
+    sort(with(.res2, paste(name, cell, inside)))
+  )
+)
+```
 
 With this function, we can annotate for any gene if a cell is included in its `lemur` neighborhood.
 
