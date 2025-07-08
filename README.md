@@ -18,7 +18,6 @@ Labs are organized by topic, using only a short identifier
 
 * [Bulk RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/bulk-rnaseq/rnaseqGene_CSAMA2025.html) - `bulk-rnaseq`
 * [Single cell RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/single-cell-rnaseq/singlecell_CSAMA2025.html) - `single-cell-rnaseq`
-* [Advanced single-cell RNA-seq analysis](https://ccb-hms.github.io/osca-workbench/) `single-cell-rnaseq`
 * [Bulk ATAC-seq analysis](https://bioconductor.github.io/CSAMA-labs/bulk-atacseq/fluent-genomics-v2.html) - `bulk-atacseq`
 
 
