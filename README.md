@@ -17,10 +17,9 @@ Labs are organized by topic, using only a short identifier
 ### Tuesday
 
 * [Bulk RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/bulk-rnaseq/rnaseqGene_CSAMA2025.html) - `bulk-rnaseq`
-* [Single cell RNA-seq analysis](https://bioconductor.github.io/CSAMA-labs/single-cell-rnaseq/singlecell_CSAMA2025.html) - `single-cell-rnaseq`
+* [Single cell RNA-seq analysis 1](https://bioconductor.github.io/CSAMA-labs/single-cell-rnaseq/eda_qc.html) - `single-cell-rnaseq-1`
+* [Single cell RNA-seq analysis 2](https://bioconductor.github.io/CSAMA-labs/single-cell-rnaseq/cell_type_annotation.html) - `single-cell-rnaseq-2`
 * [Bulk ATAC-seq analysis](https://bioconductor.github.io/CSAMA-labs/bulk-atacseq/fluent-genomics-v2.html) - `bulk-atacseq`
-
-
 
 
 ### Thursday
