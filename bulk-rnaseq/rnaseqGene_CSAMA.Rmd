@@ -1,6 +1,6 @@
 ---
 title: "RNA-seq workflow: gene-level exploratory analysis and differential expression"
-subtitle: CSAMA 2025 version 
+subtitle: CSAMA 2026 version 
 author:
 - name: Michael I. Love
   affiliation: 
@@ -18,7 +18,7 @@ author:
   affiliation: Institute for Biomedicine, Eurac Research, Bolzano, Italy
 - name: Wolfgang Huber
   affiliation: *EMBL
-date: 8 July 2025
+date: 26 May 2026
 output: BiocStyle::html_document
 bibliography: bibliography.bib
 vignette: >
@@ -670,12 +670,12 @@ Here, we illustrate how it can be done with `r Biocpkg("edgeR")`, and briefly co
 ## The *DGEList*
 
 The `r Biocpkg("edgeR")` package uses another type of data container than `r Biocpkg("DESeq2")`, namely a *DGEList* object. 
-`r Biocpkg("tximeta")` provides a convenient wrapper function to generate a *DGEList* from the gene-level *SummarizedExperiment* object:
+`r Biocpkg("edgeR")` provides a convenient wrapper function to generate a *DGEList* from the gene-level *SummarizedExperiment* object:
 
 ```{r dgelist, message=FALSE}
 library(edgeR)
 
-dge <- tximeta::makeDGEList(sg)
+dge <- edgeR::DGEListFromTximeta(sg, samples = colData(sg))
 names(dge)
 head(dge$samples)
 ```
@@ -694,6 +694,13 @@ dge <- dge[keep, ]
 dim(dge)
 ```
 
+Finally, we calculate TMM normalization factors.
+
+```{r}
+dge <- normLibSizes(dge)
+```
+
+
 ## Exploratory analysis
 
 We saw above how to perform PCA to reduce the dimensionality and explore our data set. 
@@ -706,11 +713,7 @@ The default distance between two samples can be interpreted as the "typical" log
 We generate an MDS plot from the *DGEList* object `dge`, coloring by the treatment and using different
 plot symbols for different donors.
 
-**Note:** Since the *DGEList* was created using the `makeDGEList` function, the average transcript length offsets have been incorporated in the object and will be used as offsets in downstream analysis. 
-If this is not the case, we need to estimate TMM normalization factors before performing further analysis.
-
 ```{r plotmds}
-# dge <- edgeR::calcNormFactors(dge)
 plotMDS(dge, top = 500, labels = NULL,
         col = as.numeric(dge$samples$treatment),
         cex = 0.5)
