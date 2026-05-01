@@ -30,7 +30,7 @@ Labs are organized by topic, using only a short identifier
 * [Intro to Tidyomics: tidy data analysis applied to omics data](https://tidyomics.github.io/tidy-intro-talk/)
 * [Spatial transcriptomics](https://bioconductor.github.io/CSAMA-labs/spatial-transcriptomics/spatial_CSAMA.html)
 * Trajectory analysis with [slingshot](https://bioconductor.org/packages/devel/bioc/vignettes/slingshot/inst/doc/vignette.html) and [tradeSeq](https://www.bioconductor.org/packages/release/bioc/vignettes/tradeSeq/inst/doc/tradeSeq.html)
-* [Interactive exploration with iSEE](https://csoneson.github.io/isee-lab-csama2025/)
+* [Interactive exploration with iSEE](https://csoneson.github.io/isee-lab-csama2026/)
 * [Working with Image Data](https://github.com/wolfganghuber/WorkingWithImageData)
 
 ## Instructors: setting up git pre-commit hooks
