@@ -2,7 +2,7 @@
 title: "Reproducible publishing and literate programming with Quarto"
 author: "Charlotte Soneson"
 license: "Distributed under CC-BY license"
-date: "2025-07-07"
+date: "2026-05-28"
 date-format: long
 format: 
     html:
