@@ -1,0 +1,56 @@
+/*-- scss:defaults --*/
+@import 'https://fonts.googleapis.com/css?family=Istok+Web|Oxygen|Source+Sans+Pro';
+@import 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css';
+body {
+  font-family: 'Source Sans Pro', Arial, Helvetica, sans-serif;
+  background-color: #fefefe;
+  margin-top: 0;
+}
+h1, h2, h3, h4 {
+  color: #1881c2;
+}
+h1, h2 {
+  padding-bottom: 0.5em;
+  border-bottom-style: solid;
+  border-bottom-color: #1881c2;
+}
+.math {
+  font-size: 0.8em; 
+}
+code {
+  font-size: 0.8em !important;
+  background-color: #F7F7F7 !important;
+}
+div.sourceCode {
+  background-color: #F7F7F7 !important;
+}
+blockquote {
+  width: 80%;
+  font-style: italic;
+  color: black !important;
+  border: none !important;
+  margin: auto !important;
+  padding: 0.5em !important;
+  margin-bottom: 1em !important;
+  background-color: #F7F7F7;
+}
+div.warning {
+  background-color: #F7F7F7 !important;
+  color: #8f5902 !important;
+  font-weight: bold !important;
+  font-style: italic !important;
+}
+
+.anchorjs-link {
+  color: #1881c2;
+}
+
+.anchored-eq>.anchorjs-link {
+  z-index: 1;
+  margin-left: 0 !important;
+  font-size: 1.3rem !important;
+}
+
+.figure-caption, figcaption {
+  color: #000000
+}
