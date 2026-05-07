@@ -12,27 +12,25 @@ vignette: >
 BiocStyle::markdown()
 ```
 
-```{r setup, echo=FALSE}
+```{r setup, echo=FALSE, message=FALSE}
 knitr::opts_chunk$set(
     eval=as.logical(Sys.getenv("KNITR_EVAL", "TRUE")),
     cache=as.logical(Sys.getenv("KNITR_CACHE", "TRUE"))
 )
-suppressPackageStartupMessages({
-    library(Biostrings)
-    library(GenomicRanges)
-})
+library("Biostrings")
+library("GenomicRanges")
 ```
 
 **Original Authors:** Martin Morgan, Sonali Arora, Lori Shepherd<br />
 **Presenting Author:** [Davide Risso][], [Ilaria Billato][]</br >
-**Date:** 6-11 July, 2025</br >
+**Date:** 25 May 2026</br >
 **Back:** [Monday labs](lab-1-intro-to-r-bioc.html)
 
 [Davide Risso]: mailto: davide.risso@unipd.it
 [Ilaria Billato]: mailto: ilaria.billato@phd.unipd.it
 
 
-**Objective**: Learn the essentials of _Bioconductor_ data structures
+**Objective**: Learn some basic _Bioconductor_ data structures
 
 **Lessons learned**: 
 
