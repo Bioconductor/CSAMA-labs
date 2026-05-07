@@ -25,13 +25,6 @@ execute:
 knitr::opts_chunk$set(cache = TRUE, autodep = TRUE)
 ```
 
-```{r}
-#| label: loadpkgs
-#| message: false
-library("Biostrings")
-library("GenomicRanges")
-```
-
 **Objective**: Learn some basic _Bioconductor_ data structures
 
 **Lessons learned**: 
@@ -69,81 +62,84 @@ we can all benefit from the hard work and tested code of others.
 
 ## Objects
 
-Load the [Biostrings][] and [GenomicRanges][] package
+Load the [Biostrings][] and [GenomicRanges][] packages.
 
-```{r setup-objects}
-library(Biostrings)
-library(GenomicRanges)
+```{r}
+#| label: loadpkgs
+#| message: false
+library("Biostrings")
+library("GenomicRanges")
 ```
 
-- _Bioconductor_ makes extensive use of classes to represent
-  complicated data types
-- Classes foster interoperability -- many different packages can work
-  on the same data -- but can be a bit intimidating for the user.
-- Formal 'S4' object system
-    - Often a class is described on a particular home page, e.g.,
+_Bioconductor_ makes extensive use of classes to represent complicated data types.
+Classes foster interoperability -- many different packages can work on the same data -- but can be a bit intimidating for the user.
+
+Formal 'S4' object system:
+
+  - Often a class is described on a particular home page, e.g.,
       `?GRanges`, and in vignettes, e.g.,
       `vignette(package="GenomicRanges")`,
       `vignette("GenomicRangesIntroduction")`
-    - Many methods and classes can be discovered interactively , e.g.,
+  - Many methods and classes can be discovered interactively , e.g.,
       `methods(class="GRanges")` to find out what one can do with a
       `GRanges` instance, and `methods(findOverlaps)` for classes that
       the `findOverlaps()` function operates on.
-    - In more advanced cases, one can look at the actual definition of
+  - In more advanced cases, one can look at the actual definition of
       a class or method using `getClass()`, `getMethod()`
-- Interactive help
+
+Interactive help
     - `?findOverlaps,<tab>` to select help on a specific method,
       `?GRanges-class` for help on a class.
 
-## Example & short exercise: _Biostrings_
+## Example & short exercise: 
 
-Example: _Biostrings_ for DNA sequences
+Load the `phiX174Phage` data set. 
 
-```{r Biostrings, message=FALSE}
-library(Biostrings)  
-library(pwalign)
-# Biological sequences
-data(phiX174Phage)                      # sample data, see ?phiX174Phage
+```{r}
+#| label: phiX174Phage
+#| message: false
+data("phiX174Phage")                     
 phiX174Phage
-m <- consensusMatrix(phiX174Phage)[1:4,] # nucl. x position counts
-polymorphic <- which(colSums(m != 0) > 1)
-m[, polymorphic]
-```
-```{r methods, eval=FALSE}
-methods(class=class(phiX174Phage))      # 'DNAStringSet' methods
 ```
 
-**Exercises**
-
-1. Load the [Biostrings][] package and phiX174Phage data set. What class
-   is phiX174Phage? Find the help page for the class, and identify
-   interesting functions that apply to it.
-2. Discover vignettes in the Biostrings package with
-   `vignette(package="Biostrings")`. Add another argument to the
-   `vignette` function to view the 'BiostringsQuickOverview' vignette.
-3. If the internet is available, navigate to the Biostrings landing
+1. What class is `phiX174Phage`?
+2. Find the help page for the class, and identify interesting functions that apply to it.
+3. Discover vignettes in the [Biostrings][] package with
+   `vignette(package = "Biostrings")`. Add another argument to the
+   `vignette` function to view the `BiostringsQuickOverview` vignette.
+4. If the internet is available, navigate to the [Biostrings][] landing
    page on http://bioconductor.org. Do this by visiting the
-   [biocViews][] page. Can you find the BiostringsQuickOverview
+   [biocViews][] page. Can you find the `BiostringsQuickOverview`
    vignette on the web site?
-4. The following code loads some sample data, 6 versions of the
-   phiX174Phage genome as a DNAStringSet object.
 
-    ```{r phiX}
-    library(pwalign)
-    data(phiX174Phage)
-    ```
+```{r}
+#| label: ex1
+#| eval: false
+? phiX174Phage
+methods(class = class(phiX174Phage))     
+```
 
-   Explain what the following code does, and how it works
+Explain what the following code does, and how it works
 
-    ```{r consensusMatrix}
-    m <- consensusMatrix(phiX174Phage)[1:4,]
-    polymorphic <- which(colSums(m != 0) > 1)
+```{r}
+#| label: Biostrings
+#| message: false
+m <- consensusMatrix(phiX174Phage)[1:4,] 
+polymorphic <- which(colSums(m != 0) > 1)
+polymorphic
+m[, polymorphic] 
+```
+
+`m` is a matrix of nucleotides $\times$ position counts.
+
+
+```{r consensusMatrix}
     mapply(
         substr,
         start = polymorphic, stop = polymorphic,
         MoreArgs=list(x=phiX174Phage)
     )
-    ```
+```
 
 # Working with genomic ranges
 
