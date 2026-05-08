@@ -4,12 +4,23 @@ author: "Constantin Ahlmann-Eltze & Wolfgang Huber"
 date: today
 format: 
   html:
+    css: ../csama.css
+    theme: spacelab
     code-fold: false
-    code-tools: true
     embed-resources: true
+    code-tools: true
+    code-line-numbers: false 
     highlight-style: github
     toc: true 
-    code-line-numbers: false 
+    toc-location: right
+    toc-depth: 3
+    monofont: "Fira Code"
+    include-in-header:
+      text: |
+        <link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet">
+        <style>
+        code, pre { font-family: 'Fira Code', monospace; font-variant-ligatures: contextual; }
+        </style>
 lightbox: true
 bibliography: references.bib
 params:
@@ -17,6 +28,9 @@ params:
   skip_slow_chunks: true
   skip_answers: false
   skip_seurat: true
+execute:
+  freeze: true
+  fig-align: center
 ---
 
 # What you will learn in this lab
@@ -91,6 +105,7 @@ First, to visually explore the data, we logarithm transform them to account for 
 ```{r}
 #| label: kang_preprocess
 #| eval: !expr (! params$skip_execution)
+library("sparseMatrixStats")                # provides the rowVars method needed below
 sce = scater::logNormCounts(sce)
 hvg = order(MatrixGenerics::rowVars(logcounts(sce)), decreasing = TRUE)
 sce = sce[hvg[1:500], ]
@@ -129,7 +144,7 @@ The scater package also provides a `runTSNE` function
 sce = scater::runTSNE(sce, dimred = "PCA")
 ```
 
-On one hand, tSNE and UMAP are de facto standards for visualizing the cell type and state space in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested, see e.g.:
+On one hand, tSNE and UMAP are widely used for visualizing the cell type and state space in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested, see e.g.:
 
 - Force directed layout of the $k$ nearest neighbor (kNN) graph ([igraph](https://igraph.org/r/doc/layout_with_fr.html)),
 - [PHATE](https://github.com/KrishnaswamyLab/PHATE)
