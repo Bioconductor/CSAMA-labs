@@ -12,6 +12,13 @@ format:
     toc: true
     toc-location: right
     toc-depth: 3
+    monofont: "Fira Code"
+    include-in-header:
+      text: |
+        <link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet">
+        <style>
+        code, pre { font-family: 'Fira Code', monospace; font-variant-ligatures: contextual; }
+        </style>
 execute:
   freeze: true
   fig-align: center
@@ -89,9 +96,9 @@ Interactive help
     - `?findOverlaps,<tab>` to select help on a specific method,
       `?GRanges-class` for help on a class.
 
-## Example & short exercise: 
+## Example & short exercise 
 
-Load the `phiX174Phage` data set. 
+Load the `phiX174Phage` data set
 
 ```{r}
 #| label: phiX174Phage
@@ -117,7 +124,7 @@ phiX174Phage
 methods(class = class(phiX174Phage))     
 ```
 
-Explain what the following code does, and how it works
+Explain what the following code does, and how it works.
 
 ```{r}
 #| label: consensusMatrix
@@ -125,7 +132,7 @@ Explain what the following code does, and how it works
 m <- consensusMatrix(phiX174Phage)[1:4,] 
 m[, 1:6]
 ```
-`m` is a matrix of size number of nucleotides $\times$ number of positions, with the counts for each  nucleotide
+`m` is a matrix of size number of nucleotides $\times$ number of positions, with the counts for each  nucleotide.
 ```{r}
 #| label: polymorphic
 polymorphic <- which(colSums(m != 0) > 1)
@@ -138,8 +145,7 @@ sapply(polymorphic, function(i) substr(phiX174Phage, i, i)) |> `colnames<-`(poly
 
 ## _IRanges_ and _GRanges_
 
-The [IRanges][] package defines an important class for specifying
-integer ranges, e.g.,
+The [IRanges][] package defines n useful class for specifying integer ranges, e.g.,
 
 ```{r}
 #| label: iranges
@@ -270,10 +276,14 @@ IRangesList, GRangesList
 - Many *List-aware methods, but a common 'trick': apply a vectorized
   function to the unlisted representaion, then re-list
 
-        grl <- GRangesList(...)
-        orig_gr <- unlist(grl)
-        transformed_gr <- FUN(orig)
-        transformed_grl <- relist(transformed_gr, grl)
+```{r}
+#| label: relist
+#| eval: false
+grl <- GRangesList(...)
+orig_gr <- unlist(grl)
+transformed_gr <- FUN(orig)
+transformed_grl <- relist(transformed_gr, grl)
+```
 
 # How to use high-throughput sequence data types in _Bioconductor_
 
@@ -449,7 +459,7 @@ Input: [rtracklayer][] `import()`
               ...
               ...
               
-# Exercises: Data representation in _R_ / _Bioconductor_
+# Exercises: sequence data representation in _R_ / _Bioconductor_
 
 This section briefly illustrates how different high-throughput
 sequence data types are represented in _R_ / _Bioconductor_. Select
@@ -488,12 +498,12 @@ Example
   into more user-friendly `BSgenome` packages. The following
   calculates GC content across chr14.
 
-    ```{r BSgenome-require, message=FALSE, warning = FALSE}
-    library(BSgenome.Hsapiens.UCSC.hg38)
-    chr14_range = GRanges("chr14", IRanges(1, seqlengths(Hsapiens)["chr14"]))
-    chr14_dna <- getSeq(Hsapiens, chr14_range)
-    letterFrequency(chr14_dna, "GC", as.prob=TRUE)
-    ```
+```{r BSgenome-require, message=FALSE, warning = FALSE}
+library("BSgenome.Hsapiens.UCSC.hg38")
+chr14_range <- GRanges("chr14", IRanges(1, seqlengths(Hsapiens)["chr14"]))
+chr14_dna <- getSeq(Hsapiens, chr14_range)
+letterFrequency(chr14_dna, "GC", as.prob=TRUE)
+```
 
 **Exercises**
 
@@ -501,68 +511,65 @@ Example
 
     - Mouse CDS sequence, from Ensembl: https://useast.ensembl.org/info/data/ftp/index.html
     
-    ```{r}
-    library(Biostrings)
-    url <- "ftp://ftp.ensembl.org/pub/release-92/fasta/mus_musculus/cds/Mus_musculus.GRCm38.cds.all.fa.gz"
-    fl <- BiocFileCache::bfcrpath(rnames = url)
-    cds <- rtracklayer::import(fl, "fasta")
-    ```
+```{r}
+url <- "ftp://ftp.ensembl.org/pub/release-92/fasta/mus_musculus/cds/Mus_musculus.GRCm38.cds.all.fa.gz"
+fl <- BiocFileCache::bfcrpath(rnames = url)
+cds <- rtracklayer::import(fl, "fasta")
+```
 
 1. For simplicity, clean up the data to remove cds with width not a
    multiple of three. Remove cds that don't start with a start codon
    `ATG` or end with a stop codon `c("TAA", "TAG", "TGA")`
  
-    ```{r}
-    pred1 <- width(cds) %% 3 == 0
-    table(pred1)
-    pred2 <- narrow(cds, 1, 3) == "ATG"
-    stops <- c("TAA", "TAG", "TGA")
-    pred3 <- narrow(cds, width(cds) - 2, width(cds)) %in% stops
-    table(pred1 & pred2 & pred3)
-    cds <- cds[ pred1 & pred2 & pred3 ]
-    ```
+```{r}
+pred1 <- width(cds) %% 3 == 0
+table(pred1)
+pred2 <- narrow(cds, 1, 3) == "ATG"
+stops <- c("TAA", "TAG", "TGA")
+pred3 <- narrow(cds, width(cds) - 2, width(cds)) %in% stops
+table(pred1 & pred2 & pred3)
+cds <- cds[ pred1 & pred2 & pred3 ]
+```
     
 2. What does the distribution of widths of the cds look like? Which
    cds has maximum width?
 
-    ```{r}
-    hist(log10(width(cds)))
-    cds[ which.max(width(cds)) ]
-    names(cds)[ which.max(width(cds)) ]
-    ```
+```{r}
+hist(log10(width(cds)))
+cds[ which.max(width(cds)) ]
+names(cds)[ which.max(width(cds)) ]
+```
 
-3. Use `letterFrequency()` to calculate the GC content of each cds;
+3. Use the `letterFrequency` function to calculate the GC content of each cds;
    visualize the distribution of GC content.
 
-    ```{r}
-    gc <- letterFrequency(cds, "GC", as.prob=TRUE)
-    head(gc)
-    hist(gc)
-    plot( log10(width(cds)), gc, pch=".")
-    ```
+```{r}
+gc <- letterFrequency(cds, "GC", as.prob=TRUE)
+head(gc)
+hist(gc)
+plot( log10(width(cds)), gc, pch=".")
+```
 
 4. Summarize codon usage in each CDS. Which codons are used most
    frequently over all CDS?
 
-    ```{r}
-    AMINO_ACID_CODE
-    aa <- translate(cds)
-    codon_use <- letterFrequency(aa, names(AMINO_ACID_CODE))
-    head(codon_use)
-    ```
+```{r}
+AMINO_ACID_CODE
+aa <- translate(cds)
+codon_use <- letterFrequency(aa, names(AMINO_ACID_CODE))
+head(codon_use)
+```
 
 5. (Advanced) -- `DNAStringSet` inherits from `Vector` and
    `Annotated`, which means that each element (sequence) can have
    additional information, for instance we can associate GC content
    with each sequence
 
-    ```{r}
-    mcols(cds) <- DataFrame(
-        GC = gc[,"G|C"]
-    )
-    mcols(cds, use.names = FALSE)
-    mcols(cds[1:3], use.names = FALSE)
-    ```
+```{r}
+mcols(cds) <- DataFrame(GC = gc[,"G|C"])
+mcols(cds, use.names = FALSE)
+mcols(cds[1:3], use.names = FALSE)
+```
 
 ## _SummarizedExperiment_
 
@@ -588,26 +595,26 @@ Example 1: Bulk RNA-seq `airway` data
 
 - Attach the airway library and data set
 
-    ```{r, message = FALSE}
-    library(airway)
-    data(airway)
-    airway
-    ```
+```{r, message = FALSE}
+library("airway")
+data("airway")
+airway
+```
     
-- Explore the phenotypic data describing samples. Subset to include just the `"untrt"` samples.
+- Explore the phenotypic data describing samples. Subset to include just the `untrt` samples.
 
-    ```{r}
-    colData(airway)
-    airway[ , airway$dex == "untrt"]
-    ```
+```{r}
+colData(airway)
+airway[ , airway$dex == "untrt"]
+```
     
 - Calculate library size as the column sums of the assays. Reflect on
   the relationship between library size and cell / dex column
   variables and consequences for differential expression analysis.
 
-    ```{r}
-    colSums(assay(airway))
-    ```
+```{r}
+colSums(assay(airway))
+```
 
 Example 2 (advanced): single-cell RNA-seq.
 
@@ -615,9 +622,9 @@ Example 2 (advanced): single-cell RNA-seq.
   Molecular diversity of midbrain development in mouse, human, and
   stem cells; _Cell_ 167(2), 566-580.
 
-    ```{r, message=FALSE}
-    sce <- scRNAseq::LaMannoBrainData("mouse-embryo")
-    ```
+```{r, message=FALSE}
+sce <- scRNAseq::LaMannoBrainData("mouse-embryo")
+```
 
 **Exercises**
 
@@ -637,7 +644,7 @@ Example 2 (advanced): single-cell RNA-seq.
 Example
 
 ```{r ranges, message=FALSE}
-library(GenomicRanges)
+library("GenomicRanges")
 gr <- GRanges(c("chr1:10-14:+", "chr1:20-24:+", "chr1:22-26:+"))
 shift(gr, 1)                            # 1-based coordinates!
 range(gr)                               # intra-range
@@ -650,29 +657,29 @@ setdiff(range(gr), gr)                  # 'introns'
 
 1. Which of my SNPs overlap genes?
 
-    ```{r}
-    genes <- GRanges(c("chr1:30-40:+", "chr1:60-70:-"))
-    snps <- GRanges(c("chr1:35", "chr1:60", "chr1:45"))
-    countOverlaps(snps, genes) > 0
-    ```
+```{r}
+genes <- GRanges(c("chr1:30-40:+", "chr1:60-70:-"))
+snps <- GRanges(c("chr1:35", "chr1:60", "chr1:45"))
+countOverlaps(snps, genes) > 0
+```
 
 2. Which gene is 'nearest' my regulatory region? Which gene does my
    regulatory region _precede_ (i.e., upstream of)
 
-    ```{r}
-    reg <- GRanges(c("chr1:50-55", "chr1:75-80"))
-    nearest(reg, genes)
-    precede(reg, genes)
-    ```
+```{r}
+reg <- GRanges(c("chr1:50-55", "chr1:75-80"))
+nearest(reg, genes)
+precede(reg, genes)
+```
 
 3. What range do short reads cover? depth of coverage?
 
-    ```{r}
-    reads <- GRanges(c("chr1:10-19", "chr1:15-24", "chr1:30-41"))
-    coverage(reads, width = 100)
-    as(coverage(reads, width = 100), "GRanges")
-    ```
-        
+```{r}
+reads <- GRanges(c("chr1:10-19", "chr1:15-24", "chr1:30-41"))
+coverage(reads, width = 100)
+as(coverage(reads, width = 100), "GRanges")
+```
+
 Reference
 
 - Lawrence M, Huber W, Pag&egrave;s H, Aboyoun P, Carlson M, et al. (2013)
@@ -696,25 +703,27 @@ Methods
 1. Find reads supporting the junction identified above, at position
    19653707 + 66M = 19653773 of chromosome 14
 
-    ```{r bam-require, message = FALSE}
-    library(GenomicRanges)
-    library(GenomicAlignments)
-    library(Rsamtools)
+```{r bam-require, message = FALSE}
+library("GenomicRanges")
+library("GenomicAlignments")
+library("Rsamtools")
     
-    ## our 'region of interest'
-    roi <- GRanges("chr14", IRanges(19653773, width=1)) 
-    ## sample data
-    library('RNAseqData.HNRNPC.bam.chr14')
-    bf <- BamFile(RNAseqData.HNRNPC.bam.chr14_BAMFILES[[1]], asMates=TRUE)
-    ## alignments, junctions, overlapping our roi
-    paln <- readGAlignmentsList(bf)
-    j <- summarizeJunctions(paln, with.revmap=TRUE)
-    j_overlap <- j[j %over% roi]
-    
-    ## supporting reads
-    paln[j_overlap$revmap[[1]]]
-    ```
-    
+## our 'region of interest'
+roi <- GRanges("chr14", IRanges(19653773, width=1)) 
+
+## sample data
+library("RNAseqData.HNRNPC.bam.chr14")
+bf <- BamFile(RNAseqData.HNRNPC.bam.chr14_BAMFILES[[1]], asMates=TRUE)
+
+## alignments, junctions, overlapping our roi
+paln <- readGAlignmentsList(bf)
+j <- summarizeJunctions(paln, with.revmap=TRUE)
+j_overlap <- j[j %over% roi]
+
+## supporting reads
+paln[j_overlap$revmap[[1]]]
+```
+
 ## _VariantAnnotation_ (Called variants)
 
 Classes -- GenomicRanges-like behavior
@@ -735,19 +744,22 @@ Functions and methods
 1. Read variants from a VCF file, and annotate with respect to a known
    gene model
   
-    ```{r vcf, message=FALSE}
-    ## input variants
-    library(VariantAnnotation)
-    fl <- system.file("extdata", "chr22.vcf.gz", package="VariantAnnotation")
-    vcf <- readVcf(fl, "hg19")
-    seqlevels(vcf) <- "chr22"
-    ## known gene model
-    library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-    coding <- locateVariants(rowRanges(vcf),
-        TxDb.Hsapiens.UCSC.hg19.knownGene,
-        CodingVariants())
-    head(coding)
-    ```
+```{r vcf, message=FALSE}
+## input variants
+library("VariantAnnotation")
+fl <- system.file("extdata", "chr22.vcf.gz", package="VariantAnnotation")
+vcf <- readVcf(fl, "hg19")
+seqlevels(vcf) <- "chr22"
+
+## known gene model
+library("TxDb.Hsapiens.UCSC.hg19.knownGene")
+coding <- locateVariants(
+  rowRanges(vcf),
+  TxDb.Hsapiens.UCSC.hg19.knownGene,
+  CodingVariants()
+)
+head(coding)
+```
   
 Related packages
 
@@ -783,50 +795,51 @@ differential expression analysis, e.g., through [DESeq2][] and
    models already defined; the genome (hg19) is determined by the
    genome used for read alignment in the sample BAM files.
    
-    ```{r summarizeOverlaps-roi, message=FALSE}
-    library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-    exByGn <- exonsBy(TxDb.Hsapiens.UCSC.hg19.knownGene, "gene")
-    ## only chromosome 14
-    seqlevels(exByGn, pruning.mode="coarse") = "chr14"
-    ```
+```{r summarizeOverlaps-roi, message=FALSE}
+library("TxDb.Hsapiens.UCSC.hg19.knownGene")
+exByGn <- exonsBy(TxDb.Hsapiens.UCSC.hg19.knownGene, "gene")
+## only chromosome 14
+seqlevels(exByGn, pruning.mode="coarse") = "chr14"
+```
      
 2. Identify the sample BAM files.
 
-    ```{r summarizeOverlaps-bam, message=FALSE}
-    library(RNAseqData.HNRNPC.bam.chr14)
-    length(RNAseqData.HNRNPC.bam.chr14_BAMFILES)
-    ```
+```{r summarizeOverlaps-bam, message=FALSE}
+library("RNAseqData.HNRNPC.bam.chr14")
+length(RNAseqData.HNRNPC.bam.chr14_BAMFILES)
+```
      
 3. Summarize overlaps, optionally in parallel
 
-    ```{r summarizeOverlaps}
-    ## next 2 lines optional; non-Windows
-    library(BiocParallel)
-    register(MulticoreParam(workers=parallel::detectCores()))
-    olaps <- summarizeOverlaps(exByGn, RNAseqData.HNRNPC.bam.chr14_BAMFILES)
-    ```
+```{r summarizeOverlaps}
+## next 2 lines optional; non-Windows
+library("BiocParallel")
+register(MulticoreParam(workers=parallel::detectCores()))
+olaps <- summarizeOverlaps(exByGn, RNAseqData.HNRNPC.bam.chr14_BAMFILES)
+```
      
 4. Explore our handiwork, e.g., library sizes (column sums),
    relationship between gene length and number of mapped reads, etc.
 
-    ```{r summarizeOverlaps-explore}
-    olaps
-    head(assay(olaps))
-    colSums(assay(olaps))                # library sizes
-    plot(sum(width(olaps)), rowMeans(assay(olaps)), log="xy")
-    ```
+```{r summarizeOverlaps-explore}
+olaps
+head(assay(olaps))
+colSums(assay(olaps))                # library sizes
+plot(x = log10(sum(width(olaps))), 
+     y = log10(1 + rowMeans(assay(olaps))), asp = 1, pch = 16)
+```
      
 5. As an advanced exercise, investigate the relationship between GC
    content and read count
    
-    ```{r summarizeOverlaps-gc, message = FALSE}
-    library(BSgenome.Hsapiens.UCSC.hg19)
-    sequences <- getSeq(BSgenome.Hsapiens.UCSC.hg19, rowRanges(olaps))
-    gcPerExon <- letterFrequency(unlist(sequences), "GC")
-    gc <- relist(as.vector(gcPerExon), sequences)
-    gc_percent <- sum(gc) / sum(width(olaps))
-    plot(gc_percent, rowMeans(assay(olaps)), log="y")
-    ```
+```{r summarizeOverlaps-gc, message = FALSE}
+library("BSgenome.Hsapiens.UCSC.hg19")
+sequences <- getSeq(BSgenome.Hsapiens.UCSC.hg19, rowRanges(olaps))
+gcPerExon <- letterFrequency(unlist(sequences), "GC")
+gc <- relist(as.vector(gcPerExon), sequences)
+gc_percent <- sum(gc) / sum(width(olaps))
+plot(gc_percent, log10(1 + rowMeans(assay(olaps))), pch = 16)
+```
    
 [biocViews]: http://bioconductor.org/packages/release/BiocViews.html#___Software
 [AnnotationData]: http://bioconductor.org/packages/release/BiocViews.html#___AnnotationData
