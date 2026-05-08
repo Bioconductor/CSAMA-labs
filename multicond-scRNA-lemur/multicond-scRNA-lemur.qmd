@@ -25,7 +25,7 @@ lightbox: true
 bibliography: references.bib
 params:
   skip_slow_chunks: true
-  skip_answers: false
+  skip_answers: true
   skip_seurat: true
 execute:
   freeze: true
@@ -97,12 +97,12 @@ In a `SingleCellExperiment` object, the metadata ("data about data") on the cell
 Follow-up question: why does the documentation for `colData` (run `?colData` in the R console) talk about `SummarizedExperiment` objects instead of `SingleCellExperiment`?
 :::
 
-First, to visually explore the data, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional vector (also known as an "embedding"), and then use UMAP to map these vectors into a two-dimensional plane for visualization on the screen. Here, we use the [`scater`](https://bioconductor.org/packages/scater/) package, which adds a new slot called `logcounts` and the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
+First, to visually explore the data, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional vector (also known as an "embedding"), and then use UMAP to map these vectors into a two-dimensional plane for visualization on the screen. Here, we use the [`scrapper`](https://bioconductor.org/packages/scrapper/) package to add a new slot called `logcounts`, and the [`scater`](https://bioconductor.org/packages/scater/) package to add the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
 
 ```{r}
 #| label: kang_preprocess
 library("sparseMatrixStats")                # provides the rowVars method needed below
-sce <- scater::logNormCounts(sce)
+sce <- scrapper::normalizeRnaCounts.se(sce)
 hvg <- order(MatrixGenerics::rowVars(logcounts(sce)), decreasing = TRUE)
 sce <- sce[hvg[1:500], ]
 sce <- scater::runPCA(sce, ncomponents = 50)
