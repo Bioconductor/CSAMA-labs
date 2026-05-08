@@ -1,5 +1,5 @@
 ---
-title: "Lab 1.4: Data Representations"
+title: "Lab 1.4: Representations for biomolecular sequences"
 author: Martin Morgan, Sonali Arora, Lori Shepherd, [Davide Risso](mailto:davide.risso@unipd.it), [Ilaria Billato](mailto:ilaria.billato@phd.unipd.it)
 date: 25 May 2026
 format:
@@ -25,14 +25,12 @@ execute:
 knitr::opts_chunk$set(cache = TRUE, autodep = TRUE)
 ```
 
-**Objective**: Learn some basic _Bioconductor_ data structures
+**Objective**: Learn some basic _Bioconductor_ data structures for biomolecular sequences
 
 **Lessons learned**: 
 
-- Review of common bioinformatic file formats: FASTA, FASTQ, SAM /
-  BAM, VCF, BED / WIG / GTF
-- How to work with _Bioconductor_ objects for DNA sequences, genomic
-  ranges, aligned reads, and called variants.
+- Review of common bioinformatic file formats: FASTA, FASTQ, SAM /BAM, VCF, BED / WIG / GTF
+- How to work with _Bioconductor_ objects for DNA sequences, genomic ranges, aligned reads, and called variants
 
 # Classes, methods, and packages
 
@@ -98,7 +96,7 @@ Load the `phiX174Phage` data set.
 ```{r}
 #| label: phiX174Phage
 #| message: false
-data("phiX174Phage")                     
+data("phiX174Phage", package = "pwalign")                     
 phiX174Phage
 ```
 
@@ -122,23 +120,18 @@ methods(class = class(phiX174Phage))
 Explain what the following code does, and how it works
 
 ```{r}
-#| label: Biostrings
+#| label: consensusMatrix
 #| message: false
 m <- consensusMatrix(phiX174Phage)[1:4,] 
+m[, 1:6]
+```
+`m` is a matrix of size number of nucleotides $\times$ number of positions, with the counts for each  nucleotide
+```{r}
+#| label: polymorphic
 polymorphic <- which(colSums(m != 0) > 1)
 polymorphic
 m[, polymorphic] 
-```
-
-`m` is a matrix of nucleotides $\times$ position counts.
-
-
-```{r consensusMatrix}
-    mapply(
-        substr,
-        start = polymorphic, stop = polymorphic,
-        MoreArgs=list(x=phiX174Phage)
-    )
+sapply(polymorphic, function(i) substr(phiX174Phage, i, i)) |> `colnames<-`(polymorphic)
 ```
 
 # Working with genomic ranges
@@ -148,16 +141,18 @@ m[, polymorphic]
 The [IRanges][] package defines an important class for specifying
 integer ranges, e.g.,
 
-```{r iranges}
-library(IRanges)
-ir <- IRanges(start=c(10, 20, 30), width=5)
+```{r}
+#| label: iranges
+library("IRanges")
+ir <- IRanges(start = c(86, 47, 18), width = 1000)
 ir
 ```
 
 There are many interesting operations to be performed on ranges, e.g,
 `flank()` identifies adjacent ranges
 
-```{r iranges-flank}
+```{r}
+#| label: irangesflank
 flank(ir, 3)
 ```
 
@@ -188,7 +183,7 @@ particularly the ability to associate a range with a sequence name
 our `IRanges` instance, as follows
 
 ```{r granges}
-library(GenomicRanges)
+library("GenomicRanges")
 gr <- GRanges(c("chr1", "chr1", "chr2"), ir, strand=c("+", "-", "+"))
 gr
 ```
