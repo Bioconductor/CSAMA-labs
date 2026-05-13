@@ -561,7 +561,7 @@ So far, we have identified cell neighborhoods for individual genes.. While this 
 Biclustering or Coclustering is a data analysis technique that simultaneously groups both rows and columns of a matrix to identify subsets of features that exhibit coherent patterns within subsets of samples. Unlike traditional clustering, which clusters either rows or columns independently across all data, biclustering discovers local patterns by identifying groups of rows that behave similarly only across specific groups of columns. Thus, a bicluster is a submatrix whose rows and columns jointly satisfy a coherence criterion.
 :::
 
-A dedicated pipeline for biclustering of `lemur` predictions is currently in development and will be released in the near future. This approach is based on a dense matrix decomposition of the lemur differential expression followed by a discrete recruitment strategy to assign cells and genes to _multiple_ biclusters at the same time and in an unsupervised fashion -- genes can be part of multiple response programmes, and cells can respond to condition changes through the expression of multiple different programmes. Biclusters are inferred directly from the predicted differential expression using different coherence measures of the identified submatrices.
+A dedicated pipeline for biclustering of `lemur` predictions is currently in development and will be released in the near future. This approach is based on a sparse matrix decomposition of the lemur differential expression followed by a discrete recruitment strategy to assign cells and genes to _multiple_ biclusters at the same time and in an unsupervised fashion -- genes can be part of multiple response programmes, and cells can respond to condition changes through the expression of multiple different programmes. Biclusters can be rated based on reproducibility and coherence of the bicluster submatrix.
 
 The current version of `lemur` already allows for a manual approximation to this problem using the neighborhoods identified in the previous step. As a reference, we again take the top expressed gene and its associated cell neighborhood. Then, we compare this neighborhood to all other significant neighborhoods found. The similarity of these neighborhoods can be quantified using the Jaccard index $J(A, B)={|A \cap B|}/{|A \cup B|}$, which measures the similarity of two sets.
 
@@ -616,10 +616,14 @@ master_result <- list(
 )
 ```
 
-We now have a list of `{r}length(master_result$genes)` genes showing significant differential expression within a neighborhood of `{r}length(master_result$neighborhood)` cells. To visualise the result, we can color all cells belonging to the master neighborhood. 
+
 
 
 ```{r}
+#| label: fig-master-neighborhood
+#| fig-cap: 
+#|   - Master neighborhood from repeated intersection of gene neighborhoods of similar Jaccard index
+ 
 master_inside_df <- tibble(
   cell_name = colnames(fit),
   inside = cell_name %in% master_result$neighborhood
@@ -637,10 +641,13 @@ p_master_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
 p_master_neighborhood
 ```
 
-We can visually confirm that the identified master neighborhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified,
+We now have a list of `{r}length(master_result$genes)` genes showing significant differential expression within a neighborhood of `{r}length(master_result$neighborhood)` cells. To visualise the result, we can color all cells belonging to the master neighborhood as shown in @fig-master-neighborhood.
+
 
 ```{r, paged.print=FALSE}
-#| label: umap-bicluster-selected-genes
+#| label: fig-umap-bicluster-selected-genes
+#| fig-cap: 
+#|   - Differential expression of selected genes associated to the master neighborhood we constructed earlier.
 
 genes4 <- master_result$genes[1:4]
 
@@ -668,6 +675,8 @@ p_four_genes <- as_tibble(colData(sce), rownames = "cell_name") |>
 p_four_genes
 ```
 
+We can visually confirm that the identified master neighborhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified and plotting their differential expression on the UMAP in @fig-umap-bicluster-selected-genes.
+
 Note that gene expression need not be restricted to that neighborhood. Indeed, the intersection approach only guarantees to identify a neighborhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighborhoods. This highlights once again the need to identify non-exclusive and non-exhaustive biclusters, since genes can participate in multiple programmes, and programmes themselves can differ across cell neighborhoods.
 
 ::: {.callout-note collapse="true"}
@@ -680,6 +689,8 @@ This can be quantified using SVD. Let $\sigma_k$ denote the (sorted) singular va
 
 ```{r, paged.print=FALSE}
 #| label: submatrix-coherence-spectrum
+#| fig-cap: 
+#|   - Spectrum of singular values of the "bicluster" we constructed.
 
 X_sub <- assay(fit, "DE")[master_result$genes,
                           master_result$neighborhood,
