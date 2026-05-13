@@ -263,7 +263,7 @@ In the next sections we discuss these steps in more detail.
 
 ## LEMUR Integration (Step 1)
 
-Tools like MNN and Harmony take a PCA embedding and remove the effects of the specified covariates. However, there is no way to go back from the integrated embedding to the original gene space. This means that we cannot ask the counterfactual what the expression of a cell from the control condition would have been, had it been treated.
+Tools like MNN and Harmony take a PCA embedding and remove the effects of the specified covariates. You can learn more about them in the appendix at the end of this notebook. However, the drawback is that there is no way to go back from the integrated embedding to the original gene space. This means that we cannot ask the counterfactual what the expression of a cell from the control condition would have been, had it been treated.
 
 [`lemur`](https://bioconductor.org/packages/lemur/) achieves such counterfactuals by matching the subspaces of each condition [@AhlmannEltze:NatGen:2025]. @fig-subspace_matching illustrates the principle. In some sense this is a more sophisticated version of the manual matching that we saw in the previous section. The matching is a single affine transformation in contrast to shifts per cluster inferred by Harmony.
 
