@@ -40,12 +40,12 @@ Our objective is to compare single cell RNA-seq data from multiple tissue sample
 An obvious approach is to divide the constituent cells into clusters meant to represent cell types and, for each cluster separately, do pseudo-bulk differential expression with methods such as edgeR or DESEq2. 
 However, such discrete categorization tends to be an unsatisfactory model of the underlying biology. 
 
-Here, we use _latent embedding multivariate regression_ (LEMUR) (@AhlmannEltze:NatGen:2025), a model that operates without or before commitment to discrete categorization. 
+Here, we use _latent embedding multivariate regression_ (LEMUR) (@AhlmannEltze:NatGen:2025), a model that operates without or before commitment to discrete cell type categorization. 
 LEMUR fits a regression model that _predicts_ for each cell the expression of its genes in each of the conditions.
 Note that for any given cell, the expression of its genes was only _observed_ in one replicate of one condition.
 The predictions enable us to compute any _contrast_^[the technical term for differential expression effects] of interest, such as: how would the expression of a certain gene in a particular cell differ between treatment and control condition? It even lets us inter- and extrapolate between conditions, or consider more complex experimental designs such as factorial analysis, blocking factors, or continuous covariates. Given such contrasts, we can do _biclustering_ to find groups of genes that behave similarly in a group of cells. Such a group of genes may then be interpreted in terms of pathways, such a groups of cells as a cell types, a combinations of several cell types, or subsets of a cell types.
 
-![Figure 1 from *Analysis of multi-condition single-cell data with latent embedding multivariate regression* by @AhlmannEltze:NatGen:2025. The goal is to identify cells that show gene expression changes associated with experimental perturbations or study conditions.](images/lemur_figure.png)
+![Figure 1 from @AhlmannEltze:NatGen:2025.](images/lemur_figure.png)
 
 # Getting started
 
@@ -69,7 +69,7 @@ set.seed(0xbebe)
 ```
 
 ::: {.column-margin}
-The call to `set.seed`, to set the initial conditions ("seed") of R's random number generator, is optional. Here, it ensures that the results are exactly the same for everyone. Some of the methods here use stochastic sampling, but the expectation is that even with different random seeds, the results will be essentially the same. You can verify this by omiting the call to `set.seed` or calling it with a different argument.
+`set.seed` sets the initial conditions ("seed") of R's random number generator. This step is optional. Here, it ensures that the results are exactly the same for everyone. Some of the methods here use stochastic sampling, but the expectation is that even with different random seeds, the essence of the results will be the same. You can verify this by omiting the call to `set.seed` or calling it with a different argument.
 :::
 
 # Example data
@@ -86,62 +86,29 @@ sce
 ::: {.callout-note collapse="true"}
 ## Question: How many genes and cells are in the data? How do you find the metadata about each cell / gene?
 
-You can read about the number of genes and cells when printing the summary of the `sce`. Alternatively, you can use `nrow(sce)`, `ncol(sce)`, or `dim(sce)` to get these values.
+The numbers of genes and cells are mentioned when printing the summary of the `sce`. Alternatively, you can use `nrow(sce)`, `ncol(sce)`, or `dim(sce)` to directly access these values.
 
 In a `SingleCellExperiment` object, the metadata ("data about data") on the cells are accessed with `colData(sce)`, and those on the genes with `rowData(sce)`. 
-
-Follow-up question: why does the documentation for `colData` (run `?colData` in the R console) talk about `SummarizedExperiment` objects instead of `SingleCellExperiment`?
+The `SingleCellExperiment` class inherits from (extends) the `SummarizedExperiment` class, thus shares its methods, including `colData` and `rowData`.
 :::
 
-First, to visually explore the data, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional vector (also known as an "embedding"), and then use UMAP to map these vectors into a two-dimensional plane for visualization on the screen. Here, we use the [`scrapper`](https://bioconductor.org/packages/scrapper/) package to compute a new slot called `logcounts`, and the [`scater`](https://bioconductor.org/packages/scater/) package to add the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
+As always, we first visually explore the data. To this end, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional vector (also known as an "embedding"), and then use UMAP to map these vectors into a two-dimensional plane for visualization on the screen. Here, we use the [`scrapper`](https://bioconductor.org/packages/scrapper/) package to compute a new slot called `logcounts`, and the [`scater`](https://bioconductor.org/packages/scater/) package to add the slot `reducedDims(sce)` with `PCA` and `UMAP` results. Equivalent functionality exists in other packages, e.g., in `Seurat` and `scanpy`.
 
 ```{r}
 #| label: kang_preprocess
+#| message: false
 library("sparseMatrixStats")                # provides the rowVars method needed below
 sce <- scrapper::normalizeRnaCounts.se(sce)
 hvg <- order(MatrixGenerics::rowVars(logcounts(sce)), decreasing = TRUE)
 sce <- sce[hvg[1:500], ]
 sce <- scater::runPCA(sce, ncomponents = 50)
 sce <- scater::runUMAP(sce, dimred = "PCA")
+reducedDims(sce)
+reducedDims(sce) |> sapply(class)
+reducedDims(sce) |> sapply(dim)
+
 ```
 
-::: {.callout-note collapse="true"}
-## Question: How would you do a sctransform-like transformation (i.e., Pearson residuals) without using Seurat?
-
-The [transformGamPoi](https://bioconductor.org/packages/release/bioc/vignettes/transformGamPoi/inst/doc/transformGamPoi.html) package from Bioconductor provides a `residual_transform` function.
-
-```{r}
-#| label: sctransform_alternative
-assay(sce, "pearson_residuals") <- transformGamPoi::residual_transform(sce, residual = "pearson", on_disk = FALSE)
-```
-:::
-
-::: {.callout-note collapse="true"}
-## Question: What is the problem with using too few components for PCA? Is there also a problem with using too many?
-
-Too few dimensions for PCA mean that it cannot capture enough of the relevant variation in the data. This leads to a loss of subtle differences between cell states.
-
-Too many dimensions for PCA can also pose a problem. The objective of doing PCA with a number of components that is smaller than that of the original data, is to smooth out the sampling noise in the data. If too many PCA components are included, the smoothing is too weak, and the additional dimensions capture noise that can obscure biologically relevant differences. For more details see Fig. 2d in @ahlmann-eltze2023.
-:::
-
-::: {.callout-note collapse="true"}
-## Challenge: How can you use tSNE instead of UMAP? What are alternative visualization methods?
-
-The scater package also provides a `runTSNE` function
-
-```{r}
-#| label: run_tsne
-#| eval: !expr params$execute_slow_chunks
-sce <- scater::runTSNE(sce, dimred = "PCA")
-```
-
-On one hand, tSNE and UMAP are widely used for visualizing the cell type and state space in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested, see e.g.:
-
-- Force directed layout of the $k$ nearest neighbor (kNN) graph ([igraph](https://igraph.org/r/doc/layout_with_fr.html)),
-- [PHATE](https://github.com/KrishnaswamyLab/PHATE)
-- [IVIS](https://bering-ivis.readthedocs.io/en/latest/index.html)
-- Unification of tSNE and UMAP using contrastive learning ([Böhm, 2023](https://arxiv.org/pdf/2210.09879.pdf))
-:::
 
 In the below two UMAP plots, the cells' positions strongly separate by treatment status (`stim`), as well as by annotated cell type (`cell`). One goal of this tutorial is to understand how different approaches use these covariates to integrate the data into shared embedding spaces or representations.
 
@@ -739,8 +706,53 @@ print(p_spectrum)
 
 For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
 
+# Appendix: variations and extensions to the workflow
 
-# Appendix: A prelude on data integration
+::: {.callout-note collapse="true"}
+## Above, we used the logarithm transformation as implemented in `scrapper::normalizeRnaCounts.se`. How would you do a Pearson residuals transformation (like `SCTransform` in `Seurat`)?
+
+In addition to calling `Seurat`'s `SCTransform`, you can use the [transformGamPoi](https://bioconductor.org/packages/release/bioc/vignettes/transformGamPoi/inst/doc/transformGamPoi.html) package from Bioconductor:
+
+```{r}
+#| label: checkSCTransform
+#| echo: false
+stopifnot(exists("SCTransform", where = asNamespace("Seurat")))
+```
+```{r}
+#| label: sctransform_alternative
+#| message: false
+assay(sce, "pearson_residuals") <- transformGamPoi::residual_transform(sce, residual = "pearson", on_disk = FALSE)
+```
+:::
+
+::: {.callout-note collapse="true"}
+## What is the problem with using too few components for PCA? Is there also a problem with using too many?
+
+Too few dimensions for PCA mean that it cannot capture enough of the relevant variation in the data. This leads to a loss of subtle differences between cell states.
+
+Too many dimensions for PCA can also pose a problem. The objective of doing PCA with a number of components that is smaller than that of the original data, is to smooth out the sampling noise in the data. If too many PCA components are included, the smoothing is too weak, and the additional dimensions capture noise that can obscure biologically relevant differences. For more details see Fig. 2d in @ahlmann-eltze2023.
+:::
+
+::: {.callout-note collapse="true"}
+## How can you use tSNE instead of UMAP? What are alternative visualization methods?
+
+The scater package also provides a `runTSNE` function
+
+```{r}
+#| label: run_tsne
+#| eval: !expr params$execute_slow_chunks
+sce <- scater::runTSNE(sce, dimred = "PCA")
+```
+
+On one hand, tSNE and UMAP are widely used for visualizing the cell type and state space in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested, see e.g.:
+
+- Force directed layout of the $k$ nearest neighbor (kNN) graph ([igraph](https://igraph.org/r/doc/layout_with_fr.html)),
+- [PHATE](https://github.com/KrishnaswamyLab/PHATE)
+- [IVIS](https://bering-ivis.readthedocs.io/en/latest/index.html)
+- Unification of tSNE and UMAP using contrastive learning ([Böhm, 2023](https://arxiv.org/pdf/2210.09879.pdf))
+:::
+
+## More on data integration
 
 When we made @fig-kang-umap, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**. The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
 
