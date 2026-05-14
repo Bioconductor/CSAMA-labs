@@ -408,7 +408,7 @@ The plot below illustrates this for the top three DE genes by `pval` which all h
 
 ```{r}
 #| label: neighbourhood-facetted-top3
-cells_inside_df_top3 <- neighborhoods_to_long_dataframe(slice_min(nei, pval, n = 3), fit)
+cells_inside_df_top3 <- neighbourhoods_to_adjacency_matrix(slice_min(nei, pval, n = 3), fit, "longdataframe")
 
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
@@ -433,6 +433,28 @@ TO DO:
 
 - use `neighbourhoods_to_adjacency_matrix` to explain the bipartite graph and the adjacency matrix.
 - let's find a better name than master neighbourhood
+
+```{r}
+#| label: adjmat
+adj <- neighbourhoods_to_adjacency_matrix(dplyr::filter(nei, adj_pval < 0.15), fit, "matrix")
+dim(adj)
+```
+```{r}
+#| label: fig-hist-rowsums-adjmat
+#| layout-ncol: 2
+ggplot(tibble(rs = rowSums(adj)), aes(x = rs)) + geom_histogram(bins = 100)
+ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
+```
+```{r}
+#| label: fig-heatmap
+#| fig-width: 10
+#| fig-height: 6
+#| fig-cap: "Adjacency matrix. Rows:cells, columns: genes"
+library("pheatmap")
+pheatmap(adj[sample(nrow(adj), 2500), ] + 0, 
+  show_rownames = FALSE, show_colnames = FALSE,
+  treeheight_row = 0, treeheight_col = 0)
+```
 
 Thus, we can do bi- or co-clustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
 
@@ -902,7 +924,7 @@ The integration method of Seurat is based on mutual nearest neighbours (MNN) by 
 
 ```{r}
 #| label: fig-seurat_integration
-#| fig-caption: "Seurat anchor integration"
+#| fig-cap: "Seurat anchor integration"
 #| eval: !expr params$execute_slow_chunks
 
 # This code only works with Seurat v5!
