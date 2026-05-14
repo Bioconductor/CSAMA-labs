@@ -452,8 +452,7 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 #| fig-cap: "Adjacency matrix. Rows:cells, columns: genes"
 library("pheatmap")
 pheatmap(adj[sample(nrow(adj), 2500), ] + 0, 
-  show_rownames = FALSE, show_colnames = FALSE,
-  treeheight_row = 0, treeheight_col = 0)
+  show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0)
 ```
 
 Thus, we can do bi- or co-clustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
