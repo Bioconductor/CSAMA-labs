@@ -122,12 +122,12 @@ In this tutorial, we use direct calls to functions in the `ggplot2` package to v
 #| fig-width: 5
 #| fig-height: 5
 #| layout-ncol: 2
-ggum = as_tibble(colData(sce)) |>
+ggum <- as_tibble(colData(sce)) |>
       mutate(umap = reducedDim(sce, "UMAP")) |>
         ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
 
-ggum + geom_point(aes(color = stim), size = 0.3)
-ggum + geom_point(aes(color = cell), size = 0.3)   
+ggum + geom_point(aes(colour = stim), size = 0.3)
+ggum + geom_point(aes(colour = cell), size = 0.3)   
 ```
 
 ::: {.callout-note collapse="true"}
@@ -136,11 +136,11 @@ ggum + geom_point(aes(color = cell), size = 0.3)
 One solution could be to use a `for` loop and filter the data for each patient, but there is a much simpler solution! Adding [`facet_wrap`](https://ggplot2.tidyverse.org/reference/facet_wrap.html) to the `ggplot` call will automatically create a subpanel for each patient:
 
 ```{r}
-#| label: fig-kang-umap_facetted
+#| label: fig-kang-umap-facetted
 #| fig-cap: Like @fig-kang-umap-1, but separately per patient ID
 #| fig-width: 10
 #| fig-height: 5
-ggum + geom_point(aes(color = stim), size = 0.3) + facet_wrap(vars(ind), ncol = 4)
+ggum + geom_point(aes(colour = stim), size = 0.3) + facet_wrap(vars(ind), ncol = 4)
 ```
 :::
 
@@ -149,10 +149,10 @@ ggum + geom_point(aes(color = stim), size = 0.3) + facet_wrap(vars(ind), ncol = 
 Dimension reduction methods such as UMAP put in considerable effort to approximate the distance relationships between the points by arranging them in the Euclidean 2D plane, so it would be a shame to distort this by incidental figure size settings and by distinct scalings of the $x$- and the $y$-axis. 
 :::
 
-This dataset already comes with cell type annotations. The cell type labels help interpret the results; however, for the purpose of this tutorial, we will not need them and, besides @fig-kang-umap2, will ignore them.
+This dataset already comes with cell type annotations. These may help us later in interpreting the results. Note that the LEMUR analysis does **not** need them.
 
 ```{r}
-#| label: fig-kang-umap2
+#| label: fig-kang-umap-celltypelabels
 #| fig-cap: Cell type labels
 #| warning: false
 #| fig-dim: !expr 10 * c(1, 1)
@@ -161,43 +161,12 @@ centroids <- as_tibble(colData(sce)) |>
   summarize(umap = matrix(colMedians(umap), nrow = 1), .by = c(stim, cell))
 
 # Use `geom_text_repel` to avoid overlapping annotations
-as_tibble(colData(sce)) |>
-  mutate(umap = reducedDim(sce, "UMAP")) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = paste(stim, cell)), size = 0.3) +
-    ggrepel::geom_text_repel(data = centroids, aes(label = paste(stim, cell))) +
-    coord_fixed()
+ggum + geom_point(aes(colour = paste(stim, cell, sep = ": ")), size = 0.3) +
+    ggrepel::geom_text_repel(data = centroids, aes(label = paste(stim, cell, sep = ": ")))
 ```
 
-::: {.callout-note collapse="true"}
-## Alternative path: Do the preprocessing with Seurat (click to see results)
 
-The following code is based on the Seurat [*Guided Clustering Tutorial*](https://satijalab.org/seurat/archive/v3.0/pbmc3k_tutorial.html).
-
-```{r}
-#| label: seurat-preprocessing
-#| eval: !expr with(params, execute_answers && execute_seurat)
-# For more information about the conversion see `?as.Seurat.CellDataSet`
-seur_obj <- Seurat::as.Seurat(muscData::Kang18_8vs8(), data = NULL)
-seur_obj <- Seurat::NormalizeData(seur_obj, normalization.method = "LogNormalize", scale.factor = 10000)
-seur_obj <- Seurat::FindVariableFeatures(seur_obj, selection.method = "vst", nfeatures = 500)
-# Subset to highly variable genes for memory efficiency
-seur_obj <- seur_obj[Seurat::VariableFeatures(object = seur_obj),]
-seur_obj <- Seurat::ScaleData(seur_obj)
-seur_obj <- Seurat::RunPCA(seur_obj, verbose = FALSE)
-seur_obj <- Seurat::RunUMAP(seur_obj, dims = 1:10)
-```
-
-```{r}
-#| label: fig-seurat-plot
-#| fig-cap: "UMAP plot after preprocessing with Seurat"
-#| eval: !expr with(params, execute_answers  && execute_seurat)
-Seurat::DimPlot(seur_obj, reduction = "umap", group.by = "stim")
-```
-:::
-
-
-# Analysis with LEMUR {#sec-analysis-with-lemur}
+# LEMUR analysis {#sec-analysis-with-lemur}
 
 ![LEMUR workflow](images/lemur_workflow.png){#fig-lemur-workflow width="100%"}
 
@@ -230,13 +199,13 @@ In the next sections we discuss these steps in more detail.
 
 ## LEMUR Integration (Step 1)
 
-Tools like MNN and Harmony take a PCA embedding and remove the effects of the specified covariates. You can learn more about them in the appendix at the end of this notebook. However, the drawback is that there is no way to go back from the integrated embedding to the original gene space. This means that we cannot ask the counterfactual what the expression of a cell from the control condition would have been, had it been treated.
+Tools like MNN and Harmony take a PCA embedding and remove the effects of the specified covariates. You can learn more about them in the Appendix (@sec-appendix). However, the drawback is that there is no way to go back from the integrated embedding to the original gene space. This means that we cannot ask the counterfactual what the expression of a cell from the control condition would have been, had it been treated.
 
-[`lemur`](https://bioconductor.org/packages/lemur/) achieves such counterfactuals by matching the subspaces of each condition [@AhlmannEltze:NatGen:2025]. @fig-subspace_matching illustrates the principle. In some sense this is a more sophisticated version of the manual matching that we saw in the previous section. The matching is a single affine transformation in contrast to shifts per cluster inferred by Harmony.
+[LEMUR](https://bioconductor.org/packages/lemur) achieves such counterfactuals by matching the subspaces of each condition [@AhlmannEltze:NatGen:2025]. @fig-subspace_matching illustrates the principle. 
 
 ![Schematic picture of data from two conditions with the respective linear subspace.](images/Subspace_illustration_both_condition_with_arrow.png){#fig-subspace_matching width="40%"}
 
-`lemur` takes as input a `SingleCellExperiment` object, the specification of the experimental design, and the number of latent dimensions. To refine the embedding, we call `align_by_grouping` and tell it to use the provided cell type annotations.
+The `lemur` function takes as input a `SingleCellExperiment` object, the specification of the experimental design, and the number of latent dimensions. To refine the embedding, we call `align_by_grouping` and tell it to use the provided cell type annotations.
 
 ```{r}
 #| label: fit-lemur-model
@@ -253,20 +222,18 @@ Making a UMAP plot of the embedding by `lemur` shows that it successfully integr
 #| fig-cap: "UMAP plot of LEMUR embedding."
 lemur_umap <- uwot::umap(t(fit$embedding))
 
-as_tibble(colData(sce)) |>
+gglem <- as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = stim), size = 0.3) + coord_fixed()
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
+
+gglem + geom_point(aes(colour = stim), size = 0.3) 
 ```
 
-We can cross-check our embedding with the provided cell type annotations by coloring each cell by cell type (using the information stored in the `colData(sce)$cell` column).
+We can cross-check our embedding with the provided cell type annotations by colouring each cell by cell type (using the information stored in the `colData(sce)$cell` column).
 ```{r}
 #| label: fig-lemur-umap-celltypes
 #| fig-cap: "Cell from the same cell types are close together after the integration"
-as_tibble(colData(sce)) |>
-  mutate(umap = lemur_umap) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = cell), size = 0.3) + coord_fixed()
+gglem + geom_point(aes(colour = cell), size = 0.3) 
 ```
 
 ::: {.callout-note}
@@ -288,7 +255,7 @@ fit2 <- align_harmony(fit2, verbose = FALSE)
 
 ## Differential expression analysis (Step 2)
 
-The advantage of the `lemur` integration is that we can predict what the expression profile of a cell from the control condition would have been, had it been stimulated, and vice versa. Contrasting those predictions tells us how much the gene expression changes for that cell in any gene.
+An advantage of the LEMUR integration is that we can predict what the expression profile of a cell from the control condition would have been, had it been stimulated, and vice versa. Contrasting those predictions tells us how much the gene expression changes for that cell in any gene.
 
 ![Differential expression with an invertible integration can be inferred as the difference between the prediction for a position from one condition and the prediction at the same position in the other condition.](images/differential_expression.png){width="60%"}
 
@@ -310,8 +277,8 @@ as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
   mutate(expr = logcounts(fit)["PLSCR1",]) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = expr), size = 0.3) +
-    scale_color_viridis_c() +
+    geom_point(aes(colour = expr), size = 0.3) +
+    scale_colour_viridis_c() +
     facet_wrap(vars(stim)) +
     coord_fixed()
 
@@ -319,8 +286,8 @@ as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
   mutate(de = assay(fit, "DE")["PLSCR1",]) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = de), size = 0.3) +
-    scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    geom_point(aes(colour = de), size = 0.3) +
+    scale_colour_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed()
 ```
 
@@ -363,7 +330,7 @@ as_tibble(colData(reduced_fit)) |>
   mutate(lemur_pred =  lemur_pred_per_cell[gene_oi,]) |>
   ggplot(aes(x = obs, y = lemur_pred)) +
     geom_abline() +
-    geom_point(aes(color = stim)) +
+    geom_point(aes(colour = stim)) +
     labs(title = "`lemur` predictions averaged per cell type and condition")
 ```
 :::
@@ -399,8 +366,8 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   mutate(de = assay(fit, "DE")[top_did_gene$name,]) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = de), size = 0.3) +
-    scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    geom_point(aes(colour = de), size = 0.3) +
+    scale_colour_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed() +
     labs(title = "Top differentially expressed gene, by did_pval")
 ```
@@ -486,8 +453,8 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(de = assay(fit, "DE")[top_did_gene$name,]) |>
   left_join(cells_inside_df, by = c("cell_name" = "cell")) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = de), size = 0.3) +
-    scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    geom_point(aes(colour = de), size = 0.3) +
+    scale_colour_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed() +
     facet_wrap(vars(inside), labeller = label_both) +
     labs(title = "Top differentially expressed gene, according to did_pval")
@@ -511,8 +478,8 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   pivot_longer(starts_with("de_"), names_sep = "_", names_to = c(".value", "gene_name")) |>
   left_join(cells_inside_df_top3, by = c("gene_name" = "name", "cell_name" = "cell")) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = de), size = 0.3) +
-    scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    geom_point(aes(colour = de), size = 0.3) +
+    scale_colour_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
     coord_fixed() +
     facet_grid(vars(inside), vars(gene_name), labeller = label_both) +
     labs(title = "Top 3 DE gene by pval")
@@ -600,15 +567,15 @@ p_master_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   left_join(master_inside_df, by = "cell_name") |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-  geom_point(aes(color = inside), size = 0.3) +
-  scale_color_manual(values = c(`FALSE` = "grey80", `TRUE` = "red")) +
+  geom_point(aes(colour = inside), size = 0.3) +
+  scale_colour_manual(values = c(`FALSE` = "grey80", `TRUE` = "red")) +
   coord_fixed() +
-  labs(title = "Master neighborhood", color = "Inside")
+  labs(title = "Master neighborhood", colour = "Inside")
 
 p_master_neighborhood
 ```
 
-We now have a list of `{r}length(master_result$genes)` genes showing significant differential expression within a neighborhood of `{r}length(master_result$neighborhood)` cells. To visualise the result, we can color all cells belonging to the master neighborhood as shown in @fig-master-neighborhood.
+We now have a list of `{r}length(master_result$genes)` genes showing significant differential expression within a neighborhood of `{r}length(master_result$neighborhood)` cells. To visualise the result, we can colour all cells belonging to the master neighborhood as shown in @fig-master-neighborhood.
 
 
 ```{r, paged.print=FALSE}
@@ -630,14 +597,14 @@ p_four_genes <- as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   left_join(gene_expr_df, by = "cell_name") |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-  geom_point(aes(color = de), size = 0.3) +
-  scale_color_gradient2(
+  geom_point(aes(colour = de), size = 0.3) +
+  scale_colour_gradient2(
     low = scales::muted("blue"),
     high = scales::muted("red")
   ) +
   coord_fixed() +
   facet_wrap(vars(gene), ncol = 2) +
-  labs(color = "DE")
+  labs(colour = "DE")
 
 p_four_genes
 ```
@@ -676,7 +643,7 @@ p_spectrum <- ggplot(
   ) +
   geom_point(
     size = 2.5,
-    color = "#2166AC"
+    colour = "#2166AC"
   ) +
   scale_x_continuous(breaks = 1:10) +
   scale_y_continuous(
@@ -710,7 +677,7 @@ print(p_spectrum)
 
 For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
 
-# Appendix: variations and extensions to the workflow
+# Appendix: variations and extensions to the workflow {#sec-appendix}
 
 ::: {.callout-note collapse="true"}
 ## Above, we used the logarithm transformation as implemented in `scrapper::normalizeRnaCounts.se`. How would you do a Pearson residuals transformation (like `SCTransform` in `Seurat`)?
@@ -755,6 +722,35 @@ On one hand, tSNE and UMAP are widely used for visualizing the cell type and sta
 - [IVIS](https://bering-ivis.readthedocs.io/en/latest/index.html)
 - Unification of tSNE and UMAP using contrastive learning ([Böhm, 2023](https://arxiv.org/pdf/2210.09879.pdf))
 :::
+
+::: {.callout-note collapse="true"}
+## Preprocessing alternative: do the preprocessing of the data with Seurat
+
+The following code is based on the Seurat [*Guided Clustering Tutorial*](https://satijalab.org/seurat/archive/v3.0/pbmc3k_tutorial.html).
+
+```{r}
+#| label: seurat-preprocessing
+#| eval: !expr with(params, execute_answers && execute_seurat)
+#| warning: true
+#| message: true
+# For more information about the conversion see `?as.Seurat.CellDataSet`
+seur_obj <- Seurat::as.Seurat(muscData::Kang18_8vs8(), data = NULL)
+seur_obj <- Seurat::NormalizeData(seur_obj, normalization.method = "LogNormalize", scale.factor = 10000)
+seur_obj <- Seurat::FindVariableFeatures(seur_obj, selection.method = "vst", nfeatures = 500)
+seur_obj <- seur_obj[Seurat::VariableFeatures(object = seur_obj), ]
+seur_obj <- Seurat::ScaleData(seur_obj)
+seur_obj <- Seurat::RunPCA(seur_obj, verbose = FALSE)
+seur_obj <- Seurat::RunUMAP(seur_obj, dims = 1:10)
+```
+
+```{r}
+#| label: fig-seurat-plot
+#| fig-cap: "UMAP plot after preprocessing with Seurat"
+#| eval: !expr with(params, execute_answers  && execute_seurat)
+Seurat::DimPlot(seur_obj, reduction = "umap", group.by = "stim")
+```
+:::
+
 
 ## More on data integration
 
@@ -826,7 +822,7 @@ int_mat_umap <- uwot::umap(t(integrated_mat))
 as_tibble(colData(sce)) |>
   mutate(umap = int_mat_umap) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = stim), size = 0.3) +
+    geom_point(aes(colour = stim), size = 0.3) +
     coord_fixed()
 ```
 
@@ -853,7 +849,7 @@ int_mat_umap2 <- uwot::umap(t(integrated_mat2))
 as_tibble(colData(sce)) |>
   mutate(umap = int_mat_umap2) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = stim), size = 0.3) +
+    geom_point(aes(colour = stim), size = 0.3) +
     coord_fixed()
 ```
 
@@ -900,7 +896,7 @@ harm_umap <- uwot::umap(harm_mat)
 as_tibble(colData(sce)) |>
   mutate(umap = harm_umap) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = stim), size = 0.3) +
+    geom_point(aes(colour = stim), size = 0.3) +
     coord_fixed()
 ```
 
