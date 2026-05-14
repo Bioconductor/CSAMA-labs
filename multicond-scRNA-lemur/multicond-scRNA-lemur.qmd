@@ -119,24 +119,28 @@ In this tutorial, we use direct calls to functions in the `ggplot2` package to v
 ```{r}
 #| label: fig-kang-umap
 #| fig-cap: UMAP of log transformed counts
-as_tibble(colData(sce)) |>
-  mutate(umap = reducedDim(sce, "UMAP")) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) + 
-    geom_point(aes(color = stim), size = 0.3) +
-    coord_fixed()
+#| fig-width: 5
+#| fig-height: 5
+#| layout-ncol: 2
+ggum = as_tibble(colData(sce)) |>
+      mutate(umap = reducedDim(sce, "UMAP")) |>
+        ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
+
+ggum + geom_point(aes(color = stim), size = 0.3)
+ggum + geom_point(aes(color = cell), size = 0.3)   
 ```
 
 ::: {.callout-note collapse="true"}
 ## Question: The `colData(sce)$ind` column lists the patient identifier for each cell. Can you use this to create a separate plot for each patient?
 
-One solution could be to use a `for` loop and filter the data for each patient, but there is a much simpler solution! Adding [facet_wrap()](https://ggplot2.tidyverse.org/reference/facet_wrap.html) to the ggplot call will automatically create a subpanel for each patient:
+One solution could be to use a `for` loop and filter the data for each patient, but there is a much simpler solution! Adding [`facet_wrap`](https://ggplot2.tidyverse.org/reference/facet_wrap.html) to the `ggplot` call will automatically create a subpanel for each patient:
 
 ```{r}
 #| label: fig-kang-umap_facetted
-as_tibble(colData(sce)) |>
-  mutate(umap = reducedDim(sce, "UMAP")) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) + geom_point(aes(color = stim), size = 0.3) + coord_fixed() +
-    facet_wrap(vars(ind), ncol = 4)
+#| fig-cap: Like @fig-kang-umap-1, but separately per patient ID
+#| fig-width: 10
+#| fig-height: 5
+ggum + geom_point(aes(color = stim), size = 0.3) + facet_wrap(vars(ind), ncol = 4)
 ```
 :::
 
@@ -754,7 +758,7 @@ On one hand, tSNE and UMAP are widely used for visualizing the cell type and sta
 
 ## More on data integration
 
-When we made @fig-kang-umap, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**. The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
+When we made @fig-kang-umap-1, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**. The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
 
 !["Integrated" UMAP.](images/integrated_data_picture.png){#fig-integrated_picture}
 
@@ -826,7 +830,7 @@ as_tibble(colData(sce)) |>
     coord_fixed()
 ```
 
-The overlap is not perfect, but better than in @fig-kang-umap.
+The overlap is not perfect, but better than in @fig-kang-umap-1.
 
 ::: {.callout-note collapse="true"}
 ## Challenge: What happens if you project on the `"stim"` subspace instead?
