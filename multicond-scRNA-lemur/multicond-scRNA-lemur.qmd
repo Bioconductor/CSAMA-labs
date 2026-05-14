@@ -174,8 +174,8 @@ LEMUR is a tool to analyze multi-condition single-cell data. A typical analysis 
 
 1. Covariate-adjusted dimensionality reduction.
 2. Prediction of the differential expression for each cell per gene.
-3. Identification of neighborhoods of cells with similar differential expression patterns.
-4. Pseudobulked differential expression testing per neighborhood.
+3. Identification of neighbourhoods of cells with similar differential expression patterns.
+4. Pseudobulked differential expression testing per neighbourhood.
 
 These are implemented by the following code.
 
@@ -302,29 +302,27 @@ ggplscr1 + geom_point(aes(colour = de), size = 0.2) +
 
 ## Neighborhood identification (Step 3) and differential expression tests (Step 4)
 
-To help identify the most interesting changes, `lemur` can aggregate the results of each gene and identify the neighborhood of cells with the most prominent coherent pattern of differential gene expression. To conduct a statistically valid differential expression test, `lemur` pseudobulks the counts for each replicate (here this is the patient).
+To help identify the most interesting changes, `lemur` can aggregate the results of each gene and identify a set of cells (which we call _neighbourhood_) with the most prominent coherent pattern of differential gene expression for that gene. Subsequently, to conduct statistically valid differential expression inference, `lemur` uses the pseudobulk approach to compute a gene count for each replicate (here: patient) on the test data that were previously set aside. The output is a `data.frame` with one row for each gene. The `neighborhood` column is a list column, where each element is a vector with the IDs of the cells that are inside the neighbourhood. The other columns describe the significance of the expression change defined in the `test_de` call.
 
-The output is a `data.frame` with one row for each gene. The `neighborhood` column is a list column, where each element is a vector with the IDs of the cells that are inside the neighborhood. The other columns describe the significance of the expression change defined in the `test_de` call.
-
-![Schematic of the neighborhood inference for a gene](images/neighborhood_inference.png){width="40%"}
+![Schematic of the neighbourhood inference for a gene](images/neighborhood_inference.png){width="40%"}
 
 ```{r, paged.print=FALSE}
-#| label: find-neighborhood-lemur
+#| label: find-neighbourhood-lemur
 #| message: false
 nei <- find_de_neighborhoods(fit, group_by = vars(ind, stim))
 head(nei)
 ```
 
-We can sort the table either by the `pval` or the `did_pval`. The `pval` measures the evidence of an expression change between control and stimulated condition for all cells inside the neighborhood. In contrast, the `did_pval` measures how much larger the expression difference is for the cells inside the neighborhood versus outside.
+We can sort the table either by the `pval` or the `did_pval`. The `pval` measures the evidence of an expression change between control and stimulated condition for all cells inside the neighbourhood. In contrast, the `did_pval` measures how much larger the expression difference is for the cells inside the neighbourhood versus outside.
 
 ```{r, paged.print=FALSE}
-#| label: find-neighborhood-lemur-results
+#| label: find-neighbourhood-lemur-results
 slice_min(nei, pval, n = 3)
 slice_min(nei, did_pval, n = 3)
 ```
 
 ```{r, paged.print=FALSE}
-#| label: find-neighborhood-lemur-result-plots2
+#| label: find-neighbourhood-lemur-result-plots2
 top_did_gene <- slice_min(nei, did_pval)
 
 as_tibble(colData(sce), rownames = "cell_name") |>
@@ -339,7 +337,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 As you can see in the above plot, there is strong differential expression of this gene in one cluster of cells, and essentially none in the other cells.
 
-To see which cells `lemur` included in the neighborhood for each gene, we will first define a small helper function that converts the `nei` dataframe--which contains one row per gene, and the neighbourhood of that gene as a vector of cell identifiers in the `neighborhood` columns--into another dataframe that has one row for each gene and for each cell, and column `inside` with a logical variable that indicates whether this cell is in the neighbourhood for that gene.
+To see which cells `lemur` included in the neighbourhood for each gene, we will first define a small helper function that converts the `nei` dataframe--which contains one row per gene, and the neighbourhood of that gene as a vector of cell identifiers in the `neighborhood` columns--into another dataframe that has one row for each gene and for each cell, and column `inside` with a logical variable that indicates whether this cell is in the neighbourhood for that gene.
 
 ::: {.column-margin}
 
@@ -348,7 +346,7 @@ Future versions of `lemur` may contain this function inside, so you dont need to
 :::
 
 ```{r}
-#| label: neighborhoods_to_long_dataframe-helper-function-1
+#| label: neighbourhoods_to_long_dataframe-helper-function-1
 #| echo: false
 neighborhoods_to_long_dataframe_old <- function(data, fit = NULL){
   nei <- data[["neighborhood"]]
@@ -373,7 +371,7 @@ neighborhoods_to_long_dataframe_old <- function(data, fit = NULL){
 ```
 
 ```{r}
-#| label: neighborhoods_to_long_dataframe-helper-function-2
+#| label: neighbourhoods_to_long_dataframe-helper-function-2
 neighborhoods_to_long_dataframe <- function(x, fit) {
   nei <- x[["neighborhood"]] 
   gene_names <- x[["name"]]
@@ -391,7 +389,7 @@ neighborhoods_to_long_dataframe <- function(x, fit) {
 ```
 
 ```{r}
-#| label: neighborhoods_to_long_dataframe-helper-function-3
+#| label: neighbourhoods_to_long_dataframe-helper-function-3
 #| echo: false
 .testdata <- slice_min(nei, pval, n = 27)
 .res1 <- neighborhoods_to_long_dataframe_old(.testdata, fit)
@@ -407,10 +405,10 @@ stopifnot(
 )
 ```
 
-With this function, we can annotate for any gene if a cell is included in its `lemur` neighborhood.
+With this function, we can annotate for any gene if a cell is included in its `lemur` neighbourhood.
 
 ```{r, paged.print=FALSE}
-#| label: neighborhood-facetted
+#| label: neighbourhood-facetted
 cells_inside_df <- neighborhoods_to_long_dataframe(top_did_gene, fit)
 
 as_tibble(colData(sce), rownames = "cell_name") |>
@@ -426,14 +424,14 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 ```
 
 ::: {.callout-warning collapse="true"}
-## Brain teaser: How are `lemur` neighborhoods different from the cluster-based differential expression tests?
+## Brain teaser: How are `lemur` neighbourhoods different from the cluster-based differential expression tests?
 
-The `lemur` neighborhoods are adaptive to the underlying expression patterns for each gene. This means that they provide optimal power to detect differential expression as well the set of cells for which the gene expression changes most.
+The `lemur` neighbourhoods are adaptive to the underlying expression patterns for each gene. This means that they provide optimal power to detect differential expression as well the set of cells for which the gene expression changes most.
 
-The plot below illustrates this for the top three DE genes by `pval` which all have very different neighborhoods. Note that the neighborhoods are convex in the low-dimensional embedding space, even though in the UMAP embedding they might not look like it. This is due to the non-linear nature of the UMAP dimensionality reduction.
+The plot below illustrates this for the top three DE genes by `pval` which all have very different neighbourhoods. Note that the neighbourhoods are convex in the low-dimensional embedding space, even though in the UMAP embedding they might not look like it. This is due to the non-linear nature of the UMAP dimensionality reduction.
 
 ```{r, paged.print=FALSE}
-#| label: neighborhood-facetted-top3
+#| label: neighbourhood-facetted-top3
 cells_inside_df_top3 <- neighborhoods_to_long_dataframe(slice_min(nei, pval, n = 3), fit)
 
 as_tibble(colData(sce), rownames = "cell_name") |>
@@ -453,7 +451,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 ## Bonus Step: Simultaneous clustering of genes and cells 
 
-So far, we have identified cell neighborhoods for individual genes.. While this is undoubtedly useful in many analyses, we are often interested in expression changes of entire gene programmes, i.e. larger sets of co-expressed genes. Investigating responses at the gene programme level can provide valuable insight into complex responses to changes in condition. `lemur` is particularly useful for this task since it provides us with a differential prediction on cell level as we saw in Step 2. Performing bi- or coclustering on this differential expression matrix allows us to identify neighborhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
+So far, we have identified cell neighbourhoods for individual genes.. While this is undoubtedly useful in many analyses, we are often interested in expression changes of entire gene programmes, i.e. larger sets of co-expressed genes. Investigating responses at the gene programme level can provide valuable insight into complex responses to changes in condition. `lemur` is particularly useful for this task since it provides us with a differential prediction on cell level as we saw in Step 2. Performing bi- or coclustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
 
 ::: {.callout-warning collapse="true"}
 ## Definition
@@ -462,7 +460,7 @@ Biclustering or Coclustering is a data analysis technique that simultaneously gr
 
 A dedicated pipeline for biclustering of `lemur` predictions is currently in development and will be released in the near future. This approach is based on a sparse matrix decomposition of the lemur differential expression followed by a discrete recruitment strategy to assign cells and genes to _multiple_ biclusters at the same time and in an unsupervised fashion -- genes can be part of multiple response programmes, and cells can respond to condition changes through the expression of multiple different programmes. Biclusters can be rated based on reproducibility and coherence of the bicluster submatrix.
 
-The current version of `lemur` already allows for a manual approximation to this problem using the neighborhoods identified in the previous step. As a reference, we again take the top expressed gene and its associated cell neighborhood. Then, we compare this neighborhood to all other significant neighborhoods found. The similarity of these neighborhoods can be quantified using the Jaccard index $J(A, B)={|A \cap B|}/{|A \cup B|}$, which measures the similarity of two sets.
+The current version of `lemur` already allows for a manual approximation to this problem using the neighbourhoods identified in the previous step. As a reference, we again take the top expressed gene and its associated cell neighbourhood. Then, we compare this neighbourhood to all other significant neighbourhoods found. The similarity of these neighbourhoods can be quantified using the Jaccard index $J(A, B)={|A \cap B|}/{|A \cup B|}$, which measures the similarity of two sets.
 
 ```{r}
 top_gene <- slice_min(nei, did_pval, n = 1, with_ties = FALSE)
@@ -491,7 +489,7 @@ jaccard_df <- nei |> filter(adj_pval < 0.05) |>
 head(jaccard_df, 10)
 ```
 
-As we can see, many neighborhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.9$, we obtain:
+As we can see, many neighbourhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.9$, we obtain:
 
 ```{r}
 recruited <- jaccard_df |>
@@ -519,9 +517,9 @@ master_result <- list(
 
 
 ```{r}
-#| label: fig-master-neighborhood
+#| label: fig-master-neighbourhood
 #| fig-cap: 
-#|   - Master neighborhood from repeated intersection of gene neighborhoods of similar Jaccard index
+#|   - Master neighbourhood from repeated intersection of gene neighbourhoods of similar Jaccard index
  
 master_inside_df <- tibble(
   cell_name = colnames(fit),
@@ -540,13 +538,13 @@ p_master_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
 p_master_neighborhood
 ```
 
-We now have a list of `{r}length(master_result$genes)` genes showing significant differential expression within a neighborhood of `{r}length(master_result$neighborhood)` cells. To visualise the result, we can colour all cells belonging to the master neighborhood as shown in @fig-master-neighborhood.
+We now have a list of `{r}length(master_result$genes)` genes showing significant differential expression within a neighbourhood of `{r}length(master_result$neighborhood)` cells. To visualise the result, we can colour all cells belonging to the master neighbourhood as shown in @fig-master-neighbourhood.
 
 
 ```{r, paged.print=FALSE}
 #| label: fig-umap-bicluster-selected-genes
 #| fig-cap: 
-#|   - Differential expression of selected genes associated to the master neighborhood we constructed earlier.
+#|   - Differential expression of selected genes associated to the master neighbourhood we constructed earlier.
 
 genes4 <- master_result$genes[1:4]
 
@@ -574,13 +572,13 @@ p_four_genes <- as_tibble(colData(sce), rownames = "cell_name") |>
 p_four_genes
 ```
 
-We can visually confirm that the identified master neighborhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified and plotting their differential expression on the UMAP in @fig-umap-bicluster-selected-genes.
+We can visually confirm that the identified master neighbourhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified and plotting their differential expression on the UMAP in @fig-umap-bicluster-selected-genes.
 
-Note that gene expression need not be restricted to that neighborhood. Indeed, the intersection approach only guarantees to identify a neighborhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighborhoods. This highlights once again the need to identify non-exclusive and non-exhaustive biclusters, since genes can participate in multiple programmes, and programmes themselves can differ across cell neighborhoods.
+Note that gene expression need not be restricted to that neighbourhood. Indeed, the intersection approach only guarantees to identify a neighbourhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighbourhoods. This highlights once again the need to identify non-exclusive and non-exhaustive biclusters, since genes can participate in multiple programmes, and programmes themselves can differ across cell neighbourhoods.
 
 ::: {.callout-note collapse="true"}
 ## Challenge: Quantifying the coherence of "biclusters"
-The goal of identifying biclusters and neighborhoods of co-expression is not only to find genes that are, for example, significantly up- or downregulated within a neighborhood, but rather to identify genes that show a coherent expression pattern. For example, if there is a gradient of differential expression within that neighborhood, it would be interesting to see if other genes from the bicluster follow the same trend. In that sense, coherence is a stronger condition than simply averaged regulation over a given neighborhood.
+The goal of identifying biclusters and neighbourhoods of co-expression is not only to find genes that are, for example, significantly up- or downregulated within a neighbourhood, but rather to identify genes that show a coherent expression pattern. For example, if there is a gradient of differential expression within that neighbourhood, it would be interesting to see if other genes from the bicluster follow the same trend. In that sense, coherence is a stronger condition than simply averaged regulation over a given neighbourhood.
 
 If all genes are indeed showing perfectly coherent expression, the bicluster submatrix has exactly one axis of variation. In other words, for each cell and gene combination the signal decomposes into a gene and a cell intrinsic part $X_{gc} = G_g C_c$. Equivalently, the submatrix simply has $\mathrm{rank}(X) = 1$.
 
@@ -684,7 +682,7 @@ sce <- scater::runTSNE(sce, dimred = "PCA")
 
 On one hand, tSNE and UMAP are widely used for visualizing the cell type and state space in single cell data analysis. On the other hand, they are often criticized for failing to represent global structure and distorting differences in the data. A number of alternatives have been suggested, see e.g.:
 
-- Force directed layout of the $k$ nearest neighbor (kNN) graph ([igraph](https://igraph.org/r/doc/layout_with_fr.html)),
+- Force directed layout of the $k$ nearest neighbour (kNN) graph ([igraph](https://igraph.org/r/doc/layout_with_fr.html)),
 - [PHATE](https://github.com/KrishnaswamyLab/PHATE)
 - [IVIS](https://bering-ivis.readthedocs.io/en/latest/index.html)
 - Unification of tSNE and UMAP using contrastive learning ([Böhm, 2023](https://arxiv.org/pdf/2210.09879.pdf))
@@ -775,7 +773,7 @@ There are many approaches to this end. The question is somewhat ill-defined and 
 
 A 2D embedding like UMAP or tSNE gives us a visual impression if variation that comes  from "uninteresting" covariates (here: treatment condition) is eliminated and variation that comes from covariates we care about is retained, but the results are not quantitative, which means we cannot objectively assess or compare the quality of the result.
 
-One simple metric to measure integration success is to see how mixed the cells from the two conditions are. For example, we can count for each cell how many of its $k$ nearest neighbors come from the same condition and how many come from the other condition(s), and then look at the distribution of this fraction. For more, see @luecken2022.
+One simple metric to measure integration success is to see how mixed the cells from the two conditions are. For example, we can count for each cell how many of its $k$ nearest neighbours come from the same condition and how many come from the other condition(s), and then look at the distribution of this fraction. For more, see @luecken2022.
 
 Follow-up challenge: Write a function to calculate the mixing metric.
 
@@ -917,7 +915,7 @@ as_tibble(colData(sce)) |>
 ::: {.callout-note collapse="true"}
 ## Challenge: How do you do integration in Seurat?
 
-The integration method of Seurat is based on mutual nearest neighbors (MNN) by @haghverdi2018. However, Seurat calls the mutual nearest neighbors _integration anchors_. The main difference is that Seurat uses canonical correspondence analysis (CCA) instead of principal component analysis (PCA) for dimensionality reduction [@butler2018].
+The integration method of Seurat is based on mutual nearest neighbours (MNN) by @haghverdi2018. However, Seurat calls the mutual nearest neighbours _integration anchors_. The main difference is that Seurat uses canonical correspondence analysis (CCA) instead of principal component analysis (PCA) for dimensionality reduction [@butler2018].
 
 ```{r}
 #| label: fig-seurat_integration
