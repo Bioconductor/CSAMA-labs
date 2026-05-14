@@ -315,13 +315,13 @@ head(nei)
 
 We can sort the table either by the `pval` or the `did_pval`. The `pval` measures the evidence of an expression change between control and stimulated condition for all cells inside the neighbourhood. In contrast, the `did_pval` measures how much larger the expression difference is for the cells inside the neighbourhood versus outside.
 
-```{r, paged.print=FALSE}
+```{r}
 #| label: find-neighbourhood-lemur-results
 slice_min(nei, pval, n = 3)
 slice_min(nei, did_pval, n = 3)
 ```
 
-```{r, paged.print=FALSE}
+```{r}
 #| label: find-neighbourhood-lemur-result-plots2
 top_did_gene <- slice_min(nei, did_pval)
 
@@ -337,77 +337,39 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 As you can see in the above plot, there is strong differential expression of this gene in one cluster of cells, and essentially none in the other cells.
 
-To see which cells `lemur` included in the neighbourhood for each gene, we will first define a small helper function that converts the `nei` dataframe--which contains one row per gene, and the neighbourhood of that gene as a vector of cell identifiers in the `neighborhood` columns--into another dataframe that has one row for each gene and for each cell, and column `inside` with a logical variable that indicates whether this cell is in the neighbourhood for that gene.
+To see which cells `lemur` included in the neighbourhood for each gene, we will first define a small helper function that converts the `nei` dataframe--which contains one row per gene, and the neighbourhood of that gene as a vector of cell identifiers in the `neighborhood` columns--into another dataframe that has one row for each gene and for each cell, and a column `inside` with a logical variable that indicates whether this cell is in the neighbourhood for that gene.
 
 ::: {.column-margin}
-
 Future versions of `lemur` may contain this function inside, so you dont need to worry about it.
-
 :::
 
 ```{r}
-#| label: neighbourhoods_to_long_dataframe-helper-function-1
-#| echo: false
-neighborhoods_to_long_dataframe_old <- function(data, fit = NULL){
-  nei <- data[["neighborhood"]]
-  gene_names <- data[["name"]]
-  cell_names <- if(! is.null(fit)) colnames(fit) else unique(unlist(nei))
-  levels2idx <- seq_along(cell_names)
-  names(levels2idx) <- cell_names
-  res <- list(
-    rep(gene_names, each = length(cell_names)),
-    rep(cell_names, times = length(gene_names)),
-    rep(FALSE, length(cell_names) * length(gene_names))
-  )
-  offset <- 0
-  for(n in nei){
-    res[[3]][offset + levels2idx[n]] <- TRUE
-    offset <- offset + length(cell_names)
-  }
-
-  names(res) <- c("name", "cell", "inside")
-  tibble::as_tibble(res)
-}
-```
-
-```{r}
-#| label: neighbourhoods_to_long_dataframe-helper-function-2
+#| label: neighbourhoods_to_long_dataframe-helper-function
 neighborhoods_to_long_dataframe <- function(x, fit) {
   nei <- x[["neighborhood"]] 
   gene_names <- x[["name"]]
   cell_names <- unique(unlist(nei))  
-  if (!missing(fit)) cell_names <- union(cell_names, colnames(fit))
+  if (!missing(fit)) 
+    cell_names <- union(cell_names, colnames(fit))
   stopifnot(!is.null(nei), !is.null(gene_names), !is.null(cell_names))
   
-  res <- matrix(FALSE, nrow = length(cell_names), ncol = length(gene_names),
-               dimnames = list(cell = cell_names, name = gene_names))
+  res <- matrix(
+    FALSE, 
+    nrow = length(cell_names), 
+    ncol = length(gene_names),
+    dimnames = list(cell = cell_names, name = gene_names)
+  )
+
   for (i in seq_along(gene_names))
     res[nei[[i]], gene_names[i]] <- TRUE
   
-  as.data.frame.table(res, responseName = "inside", stringsAsFactors = FALSE) |> as_tibble()
+  as_tibble(as.data.frame.table(res, responseName = "inside", stringsAsFactors = FALSE))
 }
-```
-
-```{r}
-#| label: neighbourhoods_to_long_dataframe-helper-function-3
-#| echo: false
-.testdata <- slice_min(nei, pval, n = 27)
-.res1 <- neighborhoods_to_long_dataframe_old(.testdata, fit)
-.res2 <- neighborhoods_to_long_dataframe(    .testdata, fit) 
-stopifnot(
-  setequal(colnames(.res1), colnames(.res2)), 
-  nrow(.res1) == nrow(.res2),
-  # need to do it like this since rows come in different order...
-  identical(
-    sort(with(.res1, paste(name, cell, inside))), 
-    sort(with(.res2, paste(name, cell, inside)))
-  )
-)
 ```
 
 With this function, we can annotate for any gene if a cell is included in its `lemur` neighbourhood.
 
-```{r, paged.print=FALSE}
+```{r}
 #| label: neighbourhood-facetted
 cells_inside_df <- neighborhoods_to_long_dataframe(top_did_gene, fit)
 
