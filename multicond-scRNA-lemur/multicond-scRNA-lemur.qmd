@@ -6,14 +6,15 @@ format:
   html:
     css: ../csama.css
     theme: spacelab
-    code-fold: false
     embed-resources: true
-    code-tools: true
-    code-line-numbers: false 
-    highlight-style: github
+    reference-location: margin
     toc: true 
     toc-location: right
     toc-depth: 3
+    code-fold: false
+    code-tools: true
+    code-line-numbers: false 
+    highlight-style: github
     monofont: "Fira Code"
     include-in-header:
       text: |
@@ -24,9 +25,10 @@ format:
 lightbox: true
 bibliography: references.bib
 params:
-  skip_slow_chunks: true
-  skip_answers: true
-  skip_seurat: true
+  execute_slow_chunks: true
+  execute_answers: true
+  execute_seurat: true
+  execute_align_harmony: false
 execute:
   freeze: true
   fig-align: center
@@ -35,18 +37,13 @@ execute:
 # What you will learn in this lab
 
 Our objective is to compare single cell RNA-seq data from multiple tissue samples across conditions. 
-An obvious approach is to divide the constituent cells into clusters meant to represent cell types and, for each cluster separately, do "pseudo-bulk" differential expression with methods such as edgeR or DESEq2. 
-However, such discrete categorization tends to be an unsatisfactory model of the
-underlying biology. 
-Here, we use latent embedding multivariate regression (LEMUR) (@AhlmannEltze:NatGen:2025), a model that operates without, or before, commitment to discrete categorization. 
-LEMUR 
+An obvious approach is to divide the constituent cells into clusters meant to represent cell types and, for each cluster separately, do pseudo-bulk differential expression with methods such as edgeR or DESEq2. 
+However, such discrete categorization tends to be an unsatisfactory model of the underlying biology. 
 
-- integrates data from different conditions, 
-- predicts each cell’s gene expression changes as a function
-of the conditions and its position in latent space and
-- for each gene, identifies a compact neighborhood of cells with consistent differential
-expression. 
-
+Here, we use _latent embedding multivariate regression_ (LEMUR) (@AhlmannEltze:NatGen:2025), a model that operates without or before commitment to discrete categorization. 
+LEMUR fits a regression model that _predicts_ for each cell the expression of its genes in each of the conditions.
+Note that for any given cell, the expression of its genes was only _observed_ in one replicate of one condition.
+The predictions enable us to compute any _contrast_^[the technical term for differential expression effects] of interest, such as: how would the expression of a certain gene in a particular cell differ between treatment and control condition? It even lets us inter- and extrapolate between conditions, or consider more complex experimental designs such as factorial analysis, blocking factors, or continuous covariates. Given such contrasts, we can do _biclustering_ to find groups of genes that behave similarly in a group of cells. Such a group of genes may then be interpreted in terms of pathways, such a groups of cells as a cell types, a combinations of several cell types, or subsets of a cell types.
 
 ![Figure 1 from *Analysis of multi-condition single-cell data with latent embedding multivariate regression* by @AhlmannEltze:NatGen:2025. The goal is to identify cells that show gene expression changes associated with experimental perturbations or study conditions.](images/lemur_figure.png)
 
@@ -56,19 +53,19 @@ To start, we attach the `tidyverse` and `SingleCellExperiment` packages:
 
 ```{r}
 #| label: initialize
-#| echo: FALSE
+#| echo: false
 knitr::opts_chunk$set(cache = TRUE, autodep = TRUE)
+options(ggplot2.discrete.fill   = RColorBrewer::brewer.pal(9, "Set1"))
+options(ggplot2.discrete.colour = RColorBrewer::brewer.pal(9, "Set1"))
 ```
 
 ```{r}
 #| label: load_packages
 #| output: false
-#| echo: !expr 1:3
+#| echo: true
 library("tidyverse")
 library("SingleCellExperiment")
 set.seed(0xbebe)
-options(ggplot2.discrete.fill   = RColorBrewer::brewer.pal(9, "Set1"))
-options(ggplot2.discrete.colour = RColorBrewer::brewer.pal(9, "Set1"))
 ```
 
 ::: {.column-margin}
@@ -86,7 +83,6 @@ sce <- muscData::Kang18_8vs8()
 sce
 ```
 
-
 ::: {.callout-note collapse="true"}
 ## Question: How many genes and cells are in the data? How do you find the metadata about each cell / gene?
 
@@ -97,7 +93,7 @@ In a `SingleCellExperiment` object, the metadata ("data about data") on the cell
 Follow-up question: why does the documentation for `colData` (run `?colData` in the R console) talk about `SummarizedExperiment` objects instead of `SingleCellExperiment`?
 :::
 
-First, to visually explore the data, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional vector (also known as an "embedding"), and then use UMAP to map these vectors into a two-dimensional plane for visualization on the screen. Here, we use the [`scrapper`](https://bioconductor.org/packages/scrapper/) package to add a new slot called `logcounts`, and the [`scater`](https://bioconductor.org/packages/scater/) package to add the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
+First, to visually explore the data, we logarithm transform them to account for the heteroskedasticity of the counts (@ahlmann-eltze2023), perform PCA to obtain for each cell a 50-dimensional vector (also known as an "embedding"), and then use UMAP to map these vectors into a two-dimensional plane for visualization on the screen. Here, we use the [`scrapper`](https://bioconductor.org/packages/scrapper/) package to compute a new slot called `logcounts`, and the [`scater`](https://bioconductor.org/packages/scater/) package to add the two slots `reducedDims(sce)` named `PCA` and `UMAP` to the `SummarizedExperiment` object. Equivalent functionality exists in `Seurat` and `scanpy`.
 
 ```{r}
 #| label: kang_preprocess
@@ -135,7 +131,7 @@ The scater package also provides a `runTSNE` function
 
 ```{r}
 #| label: run_tsne
-#| eval: !expr (!params$skip_slow_chunks)
+#| eval: !expr params$execute_slow_chunks
 sce <- scater::runTSNE(sce, dimred = "PCA")
 ```
 
@@ -209,7 +205,7 @@ The following code is based on the Seurat [*Guided Clustering Tutorial*](https:/
 
 ```{r}
 #| label: seurat-preprocessing
-#| eval: !expr (!params$skip_answers && !params$skip_seurat)
+#| eval: !expr with(params, execute_answers && execute_seurat)
 # For more information about the conversion see `?as.Seurat.CellDataSet`
 seur_obj <- Seurat::as.Seurat(muscData::Kang18_8vs8(), data = NULL)
 seur_obj <- Seurat::NormalizeData(seur_obj, normalization.method = "LogNormalize", scale.factor = 10000)
@@ -224,7 +220,7 @@ seur_obj <- Seurat::RunUMAP(seur_obj, dims = 1:10)
 ```{r}
 #| label: fig-seurat-plot
 #| fig-cap: "UMAP plot after preprocessing with Seurat"
-#| eval: !expr (!params$skip_answers  && ! params$skip_seurat)
+#| eval: !expr with(params, execute_answers  && execute_seurat)
 Seurat::DimPlot(seur_obj, reduction = "umap", group.by = "stim")
 ```
 :::
@@ -313,7 +309,7 @@ If there are no cell type labels present, `lemur` uses a modified version of the
 
 ```{r}
 #| label: align-lemur-model
-#| eval: !expr (!params$skip_answers)
+#| eval: !expr with(params, execute_answers && execute_align_harmony)
 fit2 <- lemur(sce, design = ~ stim, n_embedding = 30, verbose = FALSE)
 fit2 <- align_harmony(fit2, verbose = FALSE)
 ```
@@ -829,7 +825,7 @@ The projection is orthogonal onto the subspace, which means it matters which con
 
 ```{r}
 #| label: rev-manual-proj
-#| eval: !expr (!params$skip_answers)
+#| eval: !expr params$execute_answers
 stim_pca <- irlba::prcomp_irlba(t(stim_mat - stim_centers), n = 20, center = FALSE)
 
 integrated_mat2 <- matrix(NA, nrow = 20, ncol = ncol(sce))
@@ -904,7 +900,7 @@ The integration method of Seurat is based on mutual nearest neighbors (MNN) by @
 ```{r}
 #| label: fig-seurat_integration
 #| fig-caption: "Seurat anchor integration"
-#| eval: !expr (! params$skip_slow_chunks)
+#| eval: !expr params$execute_slow_chunks
 
 # This code only works with Seurat v5!
 seur_obj2 <- Seurat::as.Seurat(muscData::Kang18_8vs8(), data = NULL)
