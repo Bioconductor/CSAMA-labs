@@ -436,7 +436,7 @@ TO DO:
 
 Thus, we can do bi- or co-clustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
 
-::: {.callout-warning collapse="true"}
+::: {.callout-warning collapse="false"}
 ## Definition
 Biclustering or Coclustering is a data analysis technique that simultaneously groups both rows and columns of a matrix to identify subsets of features that exhibit coherent patterns within subsets of samples. Unlike traditional clustering, which clusters either rows or columns independently across all data, biclustering discovers local patterns by identifying groups of rows that behave similarly only across specific groups of columns. Thus, a bicluster is a submatrix whose rows and columns jointly satisfy a coherence criterion.
 :::
