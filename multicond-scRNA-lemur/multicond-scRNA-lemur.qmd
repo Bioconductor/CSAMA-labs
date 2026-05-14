@@ -1,6 +1,6 @@
 ---
 title: "Multi-condition single-cell RNA-seq analysis with LEMUR"
-author: "Constantin Ahlmann-Eltze & Wolfgang Huber"
+author: "Constantin Ahlmann-Eltze, Tim Herbermann & Wolfgang Huber"
 date: today
 format: 
   html:
@@ -229,181 +229,6 @@ Seurat::DimPlot(seur_obj, reduction = "umap", group.by = "stim")
 ```
 :::
 
-# A prelude on data integration
-
-When we made @fig-kang-umap, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**. The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
-
-!["Integrated" UMAP.](images/integrated_data_picture.png){#fig-integrated_picture}
-
-There are many approaches to this end. The question is somewhat ill-defined and can be formalized into a mathematical algorithm in many different ways. @luecken2022 benchmarked several approaches. Here, we first show how to do an integration manually, then with `harmony`. Later we will compare both to `lemur`. If you are just interested in using `lemur`, you can skip ahead to @sec-analysis-with-lemur.
-
-::: {.callout-note collapse="true"}
-## Question: In this tutorial we will just look at plots to assess integration success. Why is that suboptimal? How can we do better?
-
-A 2D embedding like UMAP or tSNE gives us a visual impression if variation that comes  from "uninteresting" covariates (here: treatment condition) is eliminated and variation that comes from covariates we care about is retained, but the results are not quantitative, which means we cannot objectively assess or compare the quality of the result.
-
-One simple metric to measure integration success is to see how mixed the cells from the two conditions are. For example, we can count for each cell how many of its $k$ nearest neighbors come from the same condition and how many come from the other condition(s), and then look at the distribution of this fraction. For more, see @luecken2022.
-
-Follow-up challenge: Write a function to calculate the mixing metric.
-
-Follow-up questions: Can you write an integration function that scores perfectly on this mixing metric? Hint: it can be biologically completely useless. What else would you need to measure to protect against such silly solutions?
-:::
-
-
-## Manual Projection
-
-![Schematic picture of data from two conditions. The data from the treated condition is projected onto the subspace spanned by the control condition.](images/Subspace_illustration_both_condition_projection.png){#fig-ctrl-proj width="40%"}
-
-In transcriptomic data analysis, each cell is characterized by its gene expression profile, which here we operationalize as the vector of counts for the 500 most variable genes. Accordingly, each cell is a point in a 500-dimensional _gene expression space_. Principal component analysis (PCA) finds a $P$-dimensional space ($P\le500$) such that overall, distance relationships between cells in the original space are optimally approximated by those in the reduced, $P$-dimensional space. 
-
-::: {.column-margin}
-Although there are over 20,000 genes in the human genome, the sensitivity of the assay that was used for our dataset is such that only a much smaller number of genes are well-measured, i.e., have counts high enough to be informative. Whether we use the top 500 genes by mean or by standard deviation makes no big difference. 
-:::
-
-To make these concepts more tangible, consider the cartoon in @fig-ctrl-proj. The orange blob represents an optimal two-dimensional embedding of all cells from the control condition. Similarly, the blue blob represents the treated cells. Each blob is contained within a two-dimensional subspace (plane) of the ambient space, but in general, these are different. 
-To integrate both conditions, we can map the two planes into each other, so that each point from the blue blob is mapped into the orange subspace, and vice versa.
-
-We can implement this procedure in a few lines of R code:
-
-1. We create a matrix for the cells from the control and treated conditions,
-2. we fit PCA on the control cells,
-3. we center the data, and finally
-4. we project the cells from both conditions onto the subspace of the control condition
-
-```{r}
-#| label: manual-proj
-# Each column from the matrix is the coordinate of a cell in the 500-dimensional space
-ctrl_mat <- as.matrix(logcounts(sce)[,sce$stim == "ctrl"])
-stim_mat <- as.matrix(logcounts(sce)[,sce$stim == "stim"])
-
-ctrl_centers <- rowMeans(ctrl_mat)
-stim_centers <- rowMeans(stim_mat)
-
-# `prcomp` is R's name for PCA and IRLBA is an algorithm to calculate it.
-ctrl_pca <- irlba::prcomp_irlba(t(ctrl_mat - ctrl_centers), n = 20)
-
-# With a little bit of linear algebra, we project the points onto the subspace of the control cells
-integrated_mat <- matrix(NA, nrow = 20, ncol = ncol(sce))
-integrated_mat[,sce$stim == "ctrl"] <- t(ctrl_pca$rotation) %*% (ctrl_mat - ctrl_centers)
-integrated_mat[,sce$stim == "stim"] <- t(ctrl_pca$rotation) %*% (stim_mat - stim_centers)
-```
-
-We check how successful we were by looking at a UMAP of the integrated embedding. 
-
-```{r}
-#| label: fig-manual-umap
-#| fig-cap: UMAP of log transformed counts
-#| collapse: true
-int_mat_umap <- uwot::umap(t(integrated_mat))
-
-as_tibble(colData(sce)) |>
-  mutate(umap = int_mat_umap) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = stim), size = 0.3) +
-    coord_fixed()
-```
-
-The overlap is not perfect, but better than in @fig-kang-umap.
-
-::: {.callout-note collapse="true"}
-## Challenge: What happens if you project on the `"stim"` subspace instead?
-
-![Schematic picture of data from two conditions using the stimulated condition as reference.](images/Subspace_illustration_both_condition_projection2.png){width="40%"}
-
-The projection is orthogonal onto the subspace, which means it matters which condition is chosen as reference.
-
-```{r}
-#| label: rev-manual-proj
-#| eval: !expr (!params$skip_answers)
-stim_pca <- irlba::prcomp_irlba(t(stim_mat - stim_centers), n = 20, center = FALSE)
-
-integrated_mat2 <- matrix(NA, nrow = 20, ncol = ncol(sce))
-integrated_mat2[,sce$stim == "ctrl"] <- t(stim_pca$rotation) %*% (ctrl_mat - ctrl_centers)
-integrated_mat2[,sce$stim == "stim"] <- t(stim_pca$rotation) %*% (stim_mat - stim_centers)
-
-int_mat_umap2 <- uwot::umap(t(integrated_mat2))
-
-as_tibble(colData(sce)) |>
-  mutate(umap = int_mat_umap2) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = stim), size = 0.3) +
-    coord_fixed()
-```
-
-For this example, using the `"stim"` condition as the reference leads to a worse integration.
-:::
-
-::: {.callout-warning collapse="true"}
-## Brain teaser: How can you make the manual projection approach work for any complex experimental designs?
-
-The projection approach consists of three steps:
-
-1.  Centering the data (e.g., `ctrl_mat - ctrl_centers`).
-2.  Choosing a reference condition and calculating the subspace that approximates the data from the reference condition (`irlba::prcomp_irlba(t(stim_mat - stim_centers))$rotation`).
-3.  Projecting the data from the other conditions onto that subspace (`t(ctrl_pca$rotation) %*% (stim_mat - stim_centers)`).
-
-For arbitrary experimental designs, we can perform the centering with a linear model fit. The second step remains the same. And after calculating the centered matrix, the third step is also straight forward. Below are the outlines how such a general procedure would work.
-
-```{r}
-#| label: challenge-complex-manual-adjustment
-#| eval: false
-# A complex experimental design
-lm_fit <- lm(t(logcounts(sce)) ~ condition + batch, data = colData(sce))
-# The `residuals` function returns the coordinates minus the mean at the condition.
-centered_mat <- t(residuals(lm_fit))
-# Assuming that `is_reference_condition` contains a selection of the cells
-ref_pca <- irlba::prcomp_irlba(centered_mat[,is_reference_condition], ...)
-int_mat <- t(ref_pca$rotation) %*% centered_mat
-```
-:::
-
-## Harmony
-
-Harmony is one popular tool for data integration [@korsunsky2019]. Harmony is relatively fast and can handle more complex experimental designs than just a treatment/control setup. It is built around _maximum diversity clustering_ (@fig-harmony_schematic). Unlike classical clustering algorithms, maximum diversity clustering not just minimizes the distance of each data point to a cluster center but also maximizes the mixing of conditions assigned to each cluster.
-
-![Schematic of Harmony. Screenshot from Fig. 1 of @korsunsky2019](images/harmony_schematic.png){#fig-harmony_schematic}
-
-```{r}
-#| label: harmony_integration
-#| message: false
-#| echo: !expr -1
-harm_mat <- harmony::RunHarmony(reducedDim(sce, "PCA"), colData(sce), vars_use = c("stim"))
-harm_umap <- uwot::umap(harm_mat)
-
-as_tibble(colData(sce)) |>
-  mutate(umap = harm_umap) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(color = stim), size = 0.3) +
-    coord_fixed()
-```
-
-::: {.callout-note}
-## Challenge: How much do the results change if you change the default parameters in Harmony?
-:::
-
-::: {.callout-note collapse="true"}
-## Challenge: How do you do integration in Seurat?
-
-The integration method of Seurat is based on mutual nearest neighbors (MNN) by @haghverdi2018. However, Seurat calls the mutual nearest neighbors _integration anchors_. The main difference is that Seurat uses canonical correspondence analysis (CCA) instead of principal component analysis (PCA) for dimensionality reduction [@butler2018].
-
-```{r}
-#| label: fig-seurat_integration
-#| fig-caption: "Seurat anchor integration"
-#| eval: !expr (! params$skip_slow_chunks)
-
-# This code only works with Seurat v5!
-seur_obj2 <- Seurat::as.Seurat(muscData::Kang18_8vs8(), data = NULL)
-seur_obj2[["originalexp"]] <- split(seur_obj2[["originalexp"]], f = seur_obj2$stim)
-seur_obj2 <- Seurat::NormalizeData(seur_obj2, normalization.method = "LogNormalize", scale.factor = 10000)
-seur_obj2 <- Seurat::FindVariableFeatures(seur_obj2, selection.method = "vst", nfeatures = 500)
-seur_obj2 <- Seurat::ScaleData(seur_obj2)
-seur_obj2 <- Seurat::RunPCA(seur_obj2, verbose = FALSE)
-
-seur_obj2 <- Seurat::IntegrateLayers(object = seur_obj2, method = Seurat::CCAIntegration, orig.reduction = "pca", new.reduction = "integrated.cca", verbose = FALSE)
-seur_obj2 <- Seurat::RunUMAP(seur_obj2, dims = 1:30, reduction = "integrated.cca")
-Seurat::DimPlot(seur_obj2, reduction = "umap", group.by = "stim")
-```
-:::
 
 # Analysis with LEMUR {#sec-analysis-with-lemur}
 
@@ -438,7 +263,7 @@ In the next sections we discuss these steps in more detail.
 
 ## LEMUR Integration (Step 1)
 
-Tools like MNN and Harmony take a PCA embedding and remove the effects of the specified covariates. However, there is no way to go back from the integrated embedding to the original gene space. This means that we cannot ask the counterfactual what the expression of a cell from the control condition would have been, had it been treated.
+Tools like MNN and Harmony take a PCA embedding and remove the effects of the specified covariates. You can learn more about them in the appendix at the end of this notebook. However, the drawback is that there is no way to go back from the integrated embedding to the original gene space. This means that we cannot ask the counterfactual what the expression of a cell from the control condition would have been, had it been treated.
 
 [`lemur`](https://bioconductor.org/packages/lemur/) achieves such counterfactuals by matching the subspaces of each condition [@AhlmannEltze:NatGen:2025]. @fig-subspace_matching illustrates the principle. In some sense this is a more sophisticated version of the manual matching that we saw in the previous section. The matching is a single affine transformation in contrast to shifts per cluster inferred by Harmony.
 
@@ -727,6 +552,186 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 ```
 :::
 
+## Bonus Step: Simultaneous clustering of genes and cells 
+
+So far, we have identified cell neighborhoods for individual genes.. While this is undoubtedly useful in many analyses, we are often interested in expression changes of entire gene programmes, i.e. larger sets of co-expressed genes. Investigating responses at the gene programme level can provide valuable insight into complex responses to changes in condition. `lemur` is particularly useful for this task since it provides us with a differential prediction on cell level as we saw in Step 2. Performing bi- or coclustering on this differential expression matrix allows us to identify neighborhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
+
+::: {.callout-warning collapse="true"}
+## Definition
+Biclustering or Coclustering is a data analysis technique that simultaneously groups both rows and columns of a matrix to identify subsets of features that exhibit coherent patterns within subsets of samples. Unlike traditional clustering, which clusters either rows or columns independently across all data, biclustering discovers local patterns by identifying groups of rows that behave similarly only across specific groups of columns. Thus, a bicluster is a submatrix whose rows and columns jointly satisfy a coherence criterion.
+:::
+
+A dedicated pipeline for biclustering of `lemur` predictions is currently in development and will be released in the near future. This approach is based on a sparse matrix decomposition of the lemur differential expression followed by a discrete recruitment strategy to assign cells and genes to _multiple_ biclusters at the same time and in an unsupervised fashion -- genes can be part of multiple response programmes, and cells can respond to condition changes through the expression of multiple different programmes. Biclusters can be rated based on reproducibility and coherence of the bicluster submatrix.
+
+The current version of `lemur` already allows for a manual approximation to this problem using the neighborhoods identified in the previous step. As a reference, we again take the top expressed gene and its associated cell neighborhood. Then, we compare this neighborhood to all other significant neighborhoods found. The similarity of these neighborhoods can be quantified using the Jaccard index $J(A, B)={|A \cap B|}/{|A \cup B|}$, which measures the similarity of two sets.
+
+```{r}
+top_gene <- slice_min(nei, did_pval, n = 1, with_ties = FALSE)
+ref_cells <- top_gene$neighborhood[[1]]
+
+# Function to compute Jaccard similarity
+jaccard_index <- function(a, b) {
+  a <- unique(a)
+  b <- unique(b)
+  if (length(a) == 0 && length(b) == 0) return(NA_real_)
+  length(intersect(a, b)) / length(union(a, b))
+}
+
+jaccard_df <- nei |> filter(adj_pval < 0.05) |>
+  mutate(
+    jaccard = map_dbl(neighborhood, ~ jaccard_index(.x, ref_cells)),
+    mean_expr_inside = map2_dbl(
+      name,
+      neighborhood,
+      ~ mean(assay(fit, "DE")[.x, .y], na.rm = TRUE)
+    )
+  ) |>
+  select(name, jaccard, mean_expr_inside) |>
+  arrange(desc(jaccard))
+
+head(jaccard_df, 10)
+```
+
+As we can see, many neighborhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.9$, we obtain:
+
+```{r}
+recruited <- jaccard_df |>
+  filter(jaccard > 0.9) |>
+  arrange(desc(jaccard))
+
+recruited_genes <- recruited$name
+
+recruited_neighborhoods <- nei |>
+  filter(name %in% recruited_genes) |>
+  arrange(match(name, recruited_genes)) |>
+  pull(neighborhood)
+
+master_neighborhood <- recruited_neighborhoods |>
+  as.list() |>
+  purrr::reduce(intersect)
+
+master_result <- list(
+  genes = recruited_genes,
+  neighborhood = master_neighborhood
+)
+```
+
+
+
+
+```{r}
+#| label: fig-master-neighborhood
+#| fig-cap: 
+#|   - Master neighborhood from repeated intersection of gene neighborhoods of similar Jaccard index
+ 
+master_inside_df <- tibble(
+  cell_name = colnames(fit),
+  inside = cell_name %in% master_result$neighborhood
+)
+
+p_master_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
+  mutate(umap = lemur_umap) |>
+  left_join(master_inside_df, by = "cell_name") |>
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
+  geom_point(aes(color = inside), size = 0.3) +
+  scale_color_manual(values = c(`FALSE` = "grey80", `TRUE` = "red")) +
+  coord_fixed() +
+  labs(title = "Master neighborhood", color = "Inside")
+
+p_master_neighborhood
+```
+
+We now have a list of `{r}length(master_result$genes)` genes showing significant differential expression within a neighborhood of `{r}length(master_result$neighborhood)` cells. To visualise the result, we can color all cells belonging to the master neighborhood as shown in @fig-master-neighborhood.
+
+
+```{r, paged.print=FALSE}
+#| label: fig-umap-bicluster-selected-genes
+#| fig-cap: 
+#|   - Differential expression of selected genes associated to the master neighborhood we constructed earlier.
+
+genes4 <- master_result$genes[1:4]
+
+gene_expr_df <- as.data.frame(t(assay(fit, "DE")[genes4, , drop = FALSE])) |>
+  rownames_to_column("cell_name") |>
+  pivot_longer(
+    cols = -cell_name,
+    names_to = "gene",
+    values_to = "de"
+  )
+
+p_four_genes <- as_tibble(colData(sce), rownames = "cell_name") |>
+  mutate(umap = lemur_umap) |>
+  left_join(gene_expr_df, by = "cell_name") |>
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
+  geom_point(aes(color = de), size = 0.3) +
+  scale_color_gradient2(
+    low = scales::muted("blue"),
+    high = scales::muted("red")
+  ) +
+  coord_fixed() +
+  facet_wrap(vars(gene), ncol = 2) +
+  labs(color = "DE")
+
+p_four_genes
+```
+
+We can visually confirm that the identified master neighborhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified and plotting their differential expression on the UMAP in @fig-umap-bicluster-selected-genes.
+
+Note that gene expression need not be restricted to that neighborhood. Indeed, the intersection approach only guarantees to identify a neighborhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighborhoods. This highlights once again the need to identify non-exclusive and non-exhaustive biclusters, since genes can participate in multiple programmes, and programmes themselves can differ across cell neighborhoods.
+
+::: {.callout-note collapse="true"}
+## Challenge: Quantifying the coherence of "biclusters"
+The goal of identifying biclusters and neighborhoods of co-expression is not only to find genes that are, for example, significantly up- or downregulated within a neighborhood, but rather to identify genes that show a coherent expression pattern. For example, if there is a gradient of differential expression within that neighborhood, it would be interesting to see if other genes from the bicluster follow the same trend. In that sense, coherence is a stronger condition than simply averaged regulation over a given neighborhood.
+
+If all genes are indeed showing perfectly coherent expression, the bicluster submatrix has exactly one axis of variation. In other words, for each cell and gene combination the signal decomposes into a gene and a cell intrinsic part $X_{gc} = G_g C_c$. Equivalently, the submatrix simply has $\mathrm{rank}(X) = 1$.
+
+This can be quantified using SVD. Let $\sigma_k$ denote the (sorted) singular values of the bicluster submatrix $X_\mathrm{sub}$. Then, $\alpha = \sigma^2/{\lVert X \rVert}_F^2$ quantifies how close the submatrix is to being rank one.
+
+```{r, paged.print=FALSE}
+#| label: submatrix-coherence-spectrum
+#| fig-cap: 
+#|   - Spectrum of singular values of the "bicluster" we constructed.
+
+X_sub <- assay(fit, "DE")[master_result$genes,
+                          master_result$neighborhood,
+                          drop = FALSE]
+
+sv <- svd(X_sub)
+
+sv_df <- tibble(
+  component = seq_along(sv$d[1:4]),
+  proportion = sv$d[1:4]^2 / sum(sv$d[1:4]^2)
+)
+
+p_spectrum <- ggplot(
+    sv_df |> slice_head(n = 10),
+    aes(component, proportion)
+  ) +
+  geom_point(
+    size = 2.5,
+    color = "#2166AC"
+  ) +
+  scale_x_continuous(breaks = 1:10) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  labs(
+    title = "Singular value spectrum of bicluster",
+    x = "Singular component",
+    y = expression(sigma[k]^2 / sum(sigma[k]^2))
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p_spectrum)
+```
+
+:::
+
+
 
 # Outlook
 
@@ -737,6 +742,185 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 - continuous covariates, e.g., time courses, whose effects can also be modeled using smooth non-linear functions (spline regression). 
 
 For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
+
+
+# Appendix: A prelude on data integration
+
+When we made @fig-kang-umap, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**. The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
+
+!["Integrated" UMAP.](images/integrated_data_picture.png){#fig-integrated_picture}
+
+There are many approaches to this end. The question is somewhat ill-defined and can be formalized into a mathematical algorithm in many different ways. @luecken2022 benchmarked several approaches. Here, we first show how to do an integration manually, then with `harmony`. Later we will compare both to `lemur`. If you are just interested in using `lemur`, you can skip ahead to @sec-analysis-with-lemur.
+
+::: {.callout-note collapse="true"}
+## Question: In this tutorial we will just look at plots to assess integration success. Why is that suboptimal? How can we do better?
+
+A 2D embedding like UMAP or tSNE gives us a visual impression if variation that comes  from "uninteresting" covariates (here: treatment condition) is eliminated and variation that comes from covariates we care about is retained, but the results are not quantitative, which means we cannot objectively assess or compare the quality of the result.
+
+One simple metric to measure integration success is to see how mixed the cells from the two conditions are. For example, we can count for each cell how many of its $k$ nearest neighbors come from the same condition and how many come from the other condition(s), and then look at the distribution of this fraction. For more, see @luecken2022.
+
+Follow-up challenge: Write a function to calculate the mixing metric.
+
+Follow-up questions: Can you write an integration function that scores perfectly on this mixing metric? Hint: it can be biologically completely useless. What else would you need to measure to protect against such silly solutions?
+:::
+
+
+## Manual Projection
+
+![Schematic picture of data from two conditions. The data from the treated condition is projected onto the subspace spanned by the control condition.](images/Subspace_illustration_both_condition_projection.png){#fig-ctrl-proj width="40%"}
+
+In transcriptomic data analysis, each cell is characterized by its gene expression profile, which here we operationalize as the vector of counts for the 500 most variable genes. Accordingly, each cell is a point in a 500-dimensional _gene expression space_. Principal component analysis (PCA) finds a $P$-dimensional space ($P\le500$) such that overall, distance relationships between cells in the original space are optimally approximated by those in the reduced, $P$-dimensional space. 
+
+::: {.column-margin}
+Although there are over 20,000 genes in the human genome, the sensitivity of the assay that was used for our dataset is such that only a much smaller number of genes are well-measured, i.e., have counts high enough to be informative. Whether we use the top 500 genes by mean or by standard deviation makes no big difference. 
+:::
+
+To make these concepts more tangible, consider the cartoon in @fig-ctrl-proj. The orange blob represents an optimal two-dimensional embedding of all cells from the control condition. Similarly, the blue blob represents the treated cells. Each blob is contained within a two-dimensional subspace (plane) of the ambient space, but in general, these are different. 
+To integrate both conditions, we can map the two planes into each other, so that each point from the blue blob is mapped into the orange subspace, and vice versa.
+
+We can implement this procedure in a few lines of R code:
+
+1. We create a matrix for the cells from the control and treated conditions,
+2. we fit PCA on the control cells,
+3. we center the data, and finally
+4. we project the cells from both conditions onto the subspace of the control condition
+
+```{r}
+#| label: manual-proj
+# Each column from the matrix is the coordinate of a cell in the 500-dimensional space
+ctrl_mat <- as.matrix(logcounts(sce)[,sce$stim == "ctrl"])
+stim_mat <- as.matrix(logcounts(sce)[,sce$stim == "stim"])
+
+ctrl_centers <- rowMeans(ctrl_mat)
+stim_centers <- rowMeans(stim_mat)
+
+# `prcomp` is R's name for PCA and IRLBA is an algorithm to calculate it.
+ctrl_pca <- irlba::prcomp_irlba(t(ctrl_mat - ctrl_centers), n = 20)
+
+# With a little bit of linear algebra, we project the points onto the subspace of the control cells
+integrated_mat <- matrix(NA, nrow = 20, ncol = ncol(sce))
+integrated_mat[,sce$stim == "ctrl"] <- t(ctrl_pca$rotation) %*% (ctrl_mat - ctrl_centers)
+integrated_mat[,sce$stim == "stim"] <- t(ctrl_pca$rotation) %*% (stim_mat - stim_centers)
+```
+
+We check how successful we were by looking at a UMAP of the integrated embedding. 
+
+```{r}
+#| label: fig-manual-umap
+#| fig-cap: UMAP of log transformed counts
+#| collapse: true
+int_mat_umap <- uwot::umap(t(integrated_mat))
+
+as_tibble(colData(sce)) |>
+  mutate(umap = int_mat_umap) |>
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
+    geom_point(aes(color = stim), size = 0.3) +
+    coord_fixed()
+```
+
+The overlap is not perfect, but better than in @fig-kang-umap.
+
+::: {.callout-note collapse="true"}
+## Challenge: What happens if you project on the `"stim"` subspace instead?
+
+![Schematic picture of data from two conditions using the stimulated condition as reference.](images/Subspace_illustration_both_condition_projection2.png){width="40%"}
+
+The projection is orthogonal onto the subspace, which means it matters which condition is chosen as reference.
+
+```{r}
+#| label: rev-manual-proj
+#| eval: !expr (!params$skip_answers)
+stim_pca <- irlba::prcomp_irlba(t(stim_mat - stim_centers), n = 20, center = FALSE)
+
+integrated_mat2 <- matrix(NA, nrow = 20, ncol = ncol(sce))
+integrated_mat2[,sce$stim == "ctrl"] <- t(stim_pca$rotation) %*% (ctrl_mat - ctrl_centers)
+integrated_mat2[,sce$stim == "stim"] <- t(stim_pca$rotation) %*% (stim_mat - stim_centers)
+
+int_mat_umap2 <- uwot::umap(t(integrated_mat2))
+
+as_tibble(colData(sce)) |>
+  mutate(umap = int_mat_umap2) |>
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
+    geom_point(aes(color = stim), size = 0.3) +
+    coord_fixed()
+```
+
+For this example, using the `"stim"` condition as the reference leads to a worse integration.
+:::
+
+::: {.callout-warning collapse="true"}
+## Brain teaser: How can you make the manual projection approach work for any complex experimental designs?
+
+The projection approach consists of three steps:
+
+1.  Centering the data (e.g., `ctrl_mat - ctrl_centers`).
+2.  Choosing a reference condition and calculating the subspace that approximates the data from the reference condition (`irlba::prcomp_irlba(t(stim_mat - stim_centers))$rotation`).
+3.  Projecting the data from the other conditions onto that subspace (`t(ctrl_pca$rotation) %*% (stim_mat - stim_centers)`).
+
+For arbitrary experimental designs, we can perform the centering with a linear model fit. The second step remains the same. And after calculating the centered matrix, the third step is also straight forward. Below are the outlines how such a general procedure would work.
+
+```{r}
+#| label: challenge-complex-manual-adjustment
+#| eval: false
+# A complex experimental design
+lm_fit <- lm(t(logcounts(sce)) ~ condition + batch, data = colData(sce))
+# The `residuals` function returns the coordinates minus the mean at the condition.
+centered_mat <- t(residuals(lm_fit))
+# Assuming that `is_reference_condition` contains a selection of the cells
+ref_pca <- irlba::prcomp_irlba(centered_mat[,is_reference_condition], ...)
+int_mat <- t(ref_pca$rotation) %*% centered_mat
+```
+:::
+
+## Harmony
+
+Harmony is one popular tool for data integration [@korsunsky2019]. Harmony is relatively fast and can handle more complex experimental designs than just a treatment/control setup. It is built around _maximum diversity clustering_ (@fig-harmony_schematic). Unlike classical clustering algorithms, maximum diversity clustering not just minimizes the distance of each data point to a cluster center but also maximizes the mixing of conditions assigned to each cluster.
+
+![Schematic of Harmony. Screenshot from Fig. 1 of @korsunsky2019](images/harmony_schematic.png){#fig-harmony_schematic}
+
+```{r}
+#| label: harmony_integration
+#| message: false
+#| echo: !expr -1
+harm_mat <- harmony::RunHarmony(reducedDim(sce, "PCA"), colData(sce), vars_use = c("stim"))
+harm_umap <- uwot::umap(harm_mat)
+
+as_tibble(colData(sce)) |>
+  mutate(umap = harm_umap) |>
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
+    geom_point(aes(color = stim), size = 0.3) +
+    coord_fixed()
+```
+
+::: {.callout-note}
+## Challenge: How much do the results change if you change the default parameters in Harmony?
+:::
+
+::: {.callout-note collapse="true"}
+## Challenge: How do you do integration in Seurat?
+
+The integration method of Seurat is based on mutual nearest neighbors (MNN) by @haghverdi2018. However, Seurat calls the mutual nearest neighbors _integration anchors_. The main difference is that Seurat uses canonical correspondence analysis (CCA) instead of principal component analysis (PCA) for dimensionality reduction [@butler2018].
+
+```{r}
+#| label: fig-seurat_integration
+#| fig-caption: "Seurat anchor integration"
+#| eval: !expr (! params$skip_slow_chunks)
+
+# This code only works with Seurat v5!
+seur_obj2 <- Seurat::as.Seurat(muscData::Kang18_8vs8(), data = NULL)
+seur_obj2[["originalexp"]] <- split(seur_obj2[["originalexp"]], f = seur_obj2$stim)
+seur_obj2 <- Seurat::NormalizeData(seur_obj2, normalization.method = "LogNormalize", scale.factor = 10000)
+seur_obj2 <- Seurat::FindVariableFeatures(seur_obj2, selection.method = "vst", nfeatures = 500)
+seur_obj2 <- Seurat::ScaleData(seur_obj2)
+seur_obj2 <- Seurat::RunPCA(seur_obj2, verbose = FALSE)
+
+seur_obj2 <- Seurat::IntegrateLayers(object = seur_obj2, method = Seurat::CCAIntegration, orig.reduction = "pca", new.reduction = "integrated.cca", verbose = FALSE)
+seur_obj2 <- Seurat::RunUMAP(seur_obj2, dims = 1:30, reduction = "integrated.cca")
+Seurat::DimPlot(seur_obj2, reduction = "umap", group.by = "stim")
+```
+:::
+
+
 
 
 # Session Info
