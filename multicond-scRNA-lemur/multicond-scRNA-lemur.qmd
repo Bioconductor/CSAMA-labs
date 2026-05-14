@@ -307,8 +307,7 @@ mydivergentcolourscale <- function(maxval)
 ggplscr1 + geom_point(aes(colour = de), size = 0.2) + mydivergentcolourscale(1.5)   
 ```
 
-
-## Finding neighbourhoods (Step 3) and test for differential expression (Step 4)
+## Find neighbourhoods (Step 3) and test for differential expression (Step 4)
 
 As a step towards identifying the most differential expression patterns, `lemur` can screen the results of each gene to find a set of cells (which we call _neighbourhood_) with the most prominent coherent pattern of differential gene expression for that gene. Subsequently, to conduct statistically valid differential expression inference, `lemur` uses the pseudobulk approach to compute a gene count for each replicate (here: patient) on the test data that were previously set aside. The output is a `data.frame` with one row for each gene. The `neighborhood` column contains a list, where each list element is a vector with the IDs of the cells that are inside the neighbourhood. The other columns contain statistical measures of significance.
 
