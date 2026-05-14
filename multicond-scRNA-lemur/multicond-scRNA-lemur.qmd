@@ -106,7 +106,6 @@ sce <- scater::runUMAP(sce, dimred = "PCA")
 reducedDims(sce)
 reducedDims(sce) |> sapply(class)
 reducedDims(sce) |> sapply(dim)
-
 ```
 
 
@@ -215,7 +214,7 @@ fit <- lemur(sce, design = ~ stim, n_embedding = 30, verbose = FALSE)
 fit <- align_by_grouping(fit, fit$colData$cell, verbose = FALSE)
 ```
 
-Making a UMAP plot of the embedding by `lemur` shows that it successfully integrated the conditions (@fig-lemur_umap).
+Making a UMAP plot of the embedding by `lemur` shows that it successfully integrated the conditions (@fig-lemur_umap)^[Note the line with `arrange` in the code below, which  randomly reorders the rows of the dataframe. This way, the inevitable overplotting in these UMAP plots does not favour data points that come later in the original dataframe.].
 
 ```{r}
 #| label: fig-lemur_umap
@@ -224,6 +223,7 @@ lemur_umap <- uwot::umap(t(fit$embedding))
 
 gglem <- as_tibble(colData(sce)) |>
   mutate(umap = lemur_umap) |>
+  arrange(runif(length(stim))) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
 
 gglem + geom_point(aes(colour = stim), size = 0.3) 
@@ -235,10 +235,6 @@ We can cross-check our embedding with the provided cell type annotations by colo
 #| fig-cap: "Cell from the same cell types are close together after the integration"
 gglem + geom_point(aes(colour = cell), size = 0.3) 
 ```
-
-::: {.callout-note}
-## Challenge: How much do the results change if you change the default parameters in `lemur`?
-:::
 
 ::: {.callout-note collapse="true"}
 ## Challenge: How to can the embedding of `lemur` be refined with an automated tool?
@@ -265,7 +261,7 @@ We call the `test_de` function of `lemur` to compare the expression values in th
 fit <- test_de(fit, contrast = cond(stim = "stim") - cond(stim = "ctrl"))
 ```
 
-We can now pick an individual gene (_PLSCR1_) and plot the predicted log fold change for each cell to show how it varies as a function of the underlying gene expression values (@fig-lemur_plot_de-1).
+We can now pick an individual gene (_PLSCR1_) and plot the predicted log fold change for each cell to show how it varies as a function of the underlying gene expression values (@fig-lemur_plot_de-1). The code below defines a helper function `mysequentialcolourscale` to get a suitable colour scale for our purposes.
 
 ```{r}
 #| label: fig-lemur_plot_de-1
@@ -273,6 +269,14 @@ We can now pick an individual gene (_PLSCR1_) and plot the predicted log fold ch
 #| fig-cap: "Expression of _PLSCR1_ in control and stim condition"
 #| fig-width: 7
 #| fig-height: 3.5
+# a colour scale for showing absolute expression levels, with white corresponding to zero and blue to maxval
+mysequentialcolourscale <- function(maxval)
+  scale_colour_continuous(
+     limits = c(0, 1) * maxval,
+     oob = scales::squish,
+     palette = grDevices::colorRampPalette(RColorBrewer::brewer.pal(9, "Blues"))(256)
+   )
+
 ggplscr1 <- as_tibble(colData(sce)) |>
   mutate(
     umap = lemur_umap,
@@ -282,7 +286,7 @@ ggplscr1 <- as_tibble(colData(sce)) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
   
  ggplscr1 + geom_point(aes(colour = expr), size = 0.2) +
-    scale_colour_viridis_c() +
+    mysequentialcolourscale(4) +
     facet_wrap(vars(stim))
 ```
 ```{r}
@@ -291,29 +295,35 @@ ggplscr1 <- as_tibble(colData(sce)) |>
 #| fig-cap: "Counterfactual: `lemur` predicts _PLSCR1_ differential expression between control and stimulus for each cell"
 #| fig-width: 5
 #| fig-height: 5
-ggplscr1 + geom_point(aes(colour = de), size = 0.2) +
-   scale_colour_continuous(
-     limits = c(-1, 1) * 1.5,
+
+# a colour scale for showing log fold changes, with an extended range of white in the middle (around 0)
+mydivergentcolourscale <- function(maxval)
+  scale_colour_continuous(
+     limits = c(-1, 1) * maxval,
      oob = scales::squish,
      palette = grDevices::colorRampPalette(RColorBrewer::brewer.pal(11, "RdBu")[rev(c(1:5, 6, 6, 6, 6, 7:11))])(256)
    )
+
+ggplscr1 + geom_point(aes(colour = de), size = 0.2) + mydivergentcolourscale(1.5)   
 ```
 
 
-## Neighborhood identification (Step 3) and differential expression tests (Step 4)
+## Finding neighbourhoods (Step 3) and test for differential expression (Step 4)
 
-To help identify the most interesting changes, `lemur` can aggregate the results of each gene and identify a set of cells (which we call _neighbourhood_) with the most prominent coherent pattern of differential gene expression for that gene. Subsequently, to conduct statistically valid differential expression inference, `lemur` uses the pseudobulk approach to compute a gene count for each replicate (here: patient) on the test data that were previously set aside. The output is a `data.frame` with one row for each gene. The `neighborhood` column is a list column, where each element is a vector with the IDs of the cells that are inside the neighbourhood. The other columns describe the significance of the expression change defined in the `test_de` call.
+As a step towards identifying the most differential expression patterns, `lemur` can screen the results of each gene to find a set of cells (which we call _neighbourhood_) with the most prominent coherent pattern of differential gene expression for that gene. Subsequently, to conduct statistically valid differential expression inference, `lemur` uses the pseudobulk approach to compute a gene count for each replicate (here: patient) on the test data that were previously set aside. The output is a `data.frame` with one row for each gene. The `neighborhood` column contains a list, where each list element is a vector with the IDs of the cells that are inside the neighbourhood. The other columns contain statistical measures of significance.
 
 ![Schematic of the neighbourhood inference for a gene](images/neighborhood_inference.png){width="40%"}
 
-```{r, paged.print=FALSE}
+```{r}
 #| label: find-neighbourhood-lemur
 #| message: false
+#| echo: !expr -1
+.olddigits <- options("digits"); options(digits = 3)
 nei <- find_de_neighborhoods(fit, group_by = vars(ind, stim))
 head(nei)
 ```
 
-We can sort the table either by the `pval` or the `did_pval`. The `pval` measures the evidence of an expression change between control and stimulated condition for all cells inside the neighbourhood. In contrast, the `did_pval` measures how much larger the expression difference is for the cells inside the neighbourhood versus outside.
+We can sort the table either by `pval` or `did_pval`. The p value `pval` is from a test for expression change between control and stimulated condition for all cells inside the neighbourhood. The p value `did_pval` is from a test for expression difference between the cells inside versus outside the neighbourhood.
 
 ```{r}
 #| label: find-neighbourhood-lemur-results
@@ -322,30 +332,30 @@ slice_min(nei, did_pval, n = 3)
 ```
 
 ```{r}
-#| label: find-neighbourhood-lemur-result-plots2
+#| label: fig-find-neighbourhood
 top_did_gene <- slice_min(nei, did_pval)
 
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
-  mutate(de = assay(fit, "DE")[top_did_gene$name,]) |>
+  mutate(de = assay(fit, "DE")[top_did_gene$name, ]) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(colour = de), size = 0.3) +
-    scale_colour_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    mydivergentcolourscale(1) +
     coord_fixed() +
-    labs(title = "Top differentially expressed gene, by did_pval")
+    labs(title = paste("The top differentially expressed gene by did_pval:", top_did_gene$name))
 ```
 
 As you can see in the above plot, there is strong differential expression of this gene in one cluster of cells, and essentially none in the other cells.
 
-To see which cells `lemur` included in the neighbourhood for each gene, we will first define a small helper function that converts the `nei` dataframe--which contains one row per gene, and the neighbourhood of that gene as a vector of cell identifiers in the `neighborhood` columns--into another dataframe that has one row for each gene and for each cell, and a column `inside` with a logical variable that indicates whether this cell is in the neighbourhood for that gene.
+To see which cells `lemur` included in the neighbourhood for each gene, we will first define a small helper function that converts `nei`---a  dataframe that contains one row per gene, and the neighbourhood of that gene as a vector of cell identifiers in the `neighborhood` columns--into another dataframe that has one row for each gene and for each cell, and a column `inside` with a logical variable that indicates whether this cell is in the neighbourhood for that gene.
 
 ::: {.column-margin}
 Future versions of `lemur` may contain this function inside, so you dont need to worry about it.
 :::
 
 ```{r}
-#| label: neighbourhoods_to_long_dataframe-helper-function
-neighborhoods_to_long_dataframe <- function(x, fit) {
+#| label: neighbourhoods_to_adjacency_matrix
+neighbourhoods_to_adjacency_matrix <- function(x, fit, out = c("matrix", "longdataframe")) {
   nei <- x[["neighborhood"]] 
   gene_names <- x[["name"]]
   cell_names <- unique(unlist(nei))  
@@ -353,7 +363,7 @@ neighborhoods_to_long_dataframe <- function(x, fit) {
     cell_names <- union(cell_names, colnames(fit))
   stopifnot(!is.null(nei), !is.null(gene_names), !is.null(cell_names))
   
-  res <- matrix(
+  mat <- matrix(
     FALSE, 
     nrow = length(cell_names), 
     ncol = length(gene_names),
@@ -361,17 +371,21 @@ neighborhoods_to_long_dataframe <- function(x, fit) {
   )
 
   for (i in seq_along(gene_names))
-    res[nei[[i]], gene_names[i]] <- TRUE
+    mat[nei[[i]], gene_names[i]] <- TRUE
   
-  as_tibble(as.data.frame.table(res, responseName = "inside", stringsAsFactors = FALSE))
+  switch(out,
+    matrix = mat,
+    longdataframe = as_tibble(as.data.frame.table(mat, responseName = "inside", stringsAsFactors = FALSE))
+  )
 }
 ```
 
 With this function, we can annotate for any gene if a cell is included in its `lemur` neighbourhood.
+Let's redo @fig-find-neighbourhood, but now separately for the cells inside and outside:
 
 ```{r}
 #| label: neighbourhood-facetted
-cells_inside_df <- neighborhoods_to_long_dataframe(top_did_gene, fit)
+cells_inside_df <- neighbourhoods_to_adjacency_matrix(top_did_gene, fit, "longdataframe")
 
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
@@ -379,10 +393,10 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   left_join(cells_inside_df, by = c("cell_name" = "cell")) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(colour = de), size = 0.3) +
-    scale_colour_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    mydivergentcolourscale(1) +
     coord_fixed() +
-    facet_wrap(vars(inside), labeller = label_both) +
-    labs(title = "Top differentially expressed gene, according to did_pval")
+    labs(title = paste("The top differentially expressed gene by did_pval:", top_did_gene$name)) +
+    facet_wrap(vars(inside), labeller = label_both)
 ```
 
 ::: {.callout-warning collapse="true"}
@@ -392,28 +406,35 @@ The `lemur` neighbourhoods are adaptive to the underlying expression patterns fo
 
 The plot below illustrates this for the top three DE genes by `pval` which all have very different neighbourhoods. Note that the neighbourhoods are convex in the low-dimensional embedding space, even though in the UMAP embedding they might not look like it. This is due to the non-linear nature of the UMAP dimensionality reduction.
 
-```{r, paged.print=FALSE}
+```{r}
 #| label: neighbourhood-facetted-top3
 cells_inside_df_top3 <- neighborhoods_to_long_dataframe(slice_min(nei, pval, n = 3), fit)
 
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
   mutate(de = as_tibble(t(assay(fit, "DE")[slice_min(nei, pval, n = 3)$name,]))) |>
-  unpack(de, names_sep = "_") %>%
+  unpack(de, names_sep = "_") |>
   pivot_longer(starts_with("de_"), names_sep = "_", names_to = c(".value", "gene_name")) |>
   left_join(cells_inside_df_top3, by = c("gene_name" = "name", "cell_name" = "cell")) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(colour = de), size = 0.3) +
-    scale_colour_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    mydivergentcolourscale(2) +
     coord_fixed() +
     facet_grid(vars(inside), vars(gene_name), labeller = label_both) +
-    labs(title = "Top 3 DE gene by pval")
+    labs(title = "Top 3 DE genes by pval")
 ```
 :::
 
-## Bonus Step: Simultaneous clustering of genes and cells 
+## Step 5: Simultaneous clustering of genes and cells (biclustering)
 
-So far, we have identified cell neighbourhoods for individual genes.. While this is undoubtedly useful in many analyses, we are often interested in expression changes of entire gene programmes, i.e. larger sets of co-expressed genes. Investigating responses at the gene programme level can provide valuable insight into complex responses to changes in condition. `lemur` is particularly useful for this task since it provides us with a differential prediction on cell level as we saw in Step 2. Performing bi- or coclustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
+So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. 
+
+TO DO: 
+
+- use `neighbourhoods_to_adjacency_matrix` to explain the bipartite graph and the adjacency matrix.
+- let's find a better name than master neighbourhood
+
+Thus, we can do bi- or co-clustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
 
 ::: {.callout-warning collapse="true"}
 ## Definition
