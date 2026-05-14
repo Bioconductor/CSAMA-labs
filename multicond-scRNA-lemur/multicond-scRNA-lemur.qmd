@@ -259,7 +259,7 @@ An advantage of the LEMUR integration is that we can predict what the expression
 
 ![Differential expression with an invertible integration can be inferred as the difference between the prediction for a position from one condition and the prediction at the same position in the other condition.](images/differential_expression.png){width="60%"}
 
-We call the `test_de` function of `lemur` to compare the expression values in the `"stim"` and `"ctrl"` conditions.
+We call the `test_de` function of `lemur` to compare the expression values in the `stim` and `ctrl` conditions.
 ```{r}
 #| label: lemur-calc-de
 fit <- test_de(fit, contrast = cond(stim = "stim") - cond(stim = "ctrl"))
@@ -268,72 +268,37 @@ fit <- test_de(fit, contrast = cond(stim = "stim") - cond(stim = "ctrl"))
 We can now pick an individual gene (_PLSCR1_) and plot the predicted log fold change for each cell to show how it varies as a function of the underlying gene expression values (@fig-lemur_plot_de-1).
 
 ```{r}
-#| label: fig-lemur_plot_de
-#| layout-ncol: 2
-#| fig-cap: 
-#|   - "Expression of _PLSCR1_ in control and stim condition"
-#|   - "Counterfactual: `lemur` predicts _PLSCR1_ differential expression between control and stimulus for each cell"
-as_tibble(colData(sce)) |>
-  mutate(umap = lemur_umap) |>
-  mutate(expr = logcounts(fit)["PLSCR1",]) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(colour = expr), size = 0.3) +
+#| label: fig-lemur_plot_de-1
+#| message: false
+#| fig-cap: "Expression of _PLSCR1_ in control and stim condition"
+#| fig-width: 7
+#| fig-height: 3.5
+ggplscr1 <- as_tibble(colData(sce)) |>
+  mutate(
+    umap = lemur_umap,
+    expr = logcounts(fit)["PLSCR1", ],
+    de   = assay(fit, "DE")["PLSCR1", ]
+  ) |>
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
+  
+ ggplscr1 + geom_point(aes(colour = expr), size = 0.2) +
     scale_colour_viridis_c() +
-    facet_wrap(vars(stim)) +
-    coord_fixed()
-
-as_tibble(colData(sce)) |>
-  mutate(umap = lemur_umap) |>
-  mutate(de = assay(fit, "DE")["PLSCR1",]) |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-    geom_point(aes(colour = de), size = 0.3) +
-    scale_colour_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
-    coord_fixed()
+    facet_wrap(vars(stim))
 ```
-
-This approach has the advantage over the traditional cluster/cell type-based analysis that it can detect smooth differential expression gradients.
-
-::: {.callout-note collapse="true"}
-## Challenge: Calculate the differential expression for each cell type using [glmGamPoi](https://bioconductor.org/packages/release/bioc/vignettes/glmGamPoi/inst/doc/pseudobulk.html).
-
-`glmGamPoi` is a differential expression tool inspired by `edgeR` and `DESeq2` that is specifically designed for single cell RNA-seq data.
-
 ```{r}
-#| label: glmGamPoi_de_test
-psce <- glmGamPoi::pseudobulk(fit, group_by = vars(cell, ind, stim))
-# Filter out NAs
-psce <- psce[,! is.na(psce$cell)]
-glm_fit <- glmGamPoi::glm_gp(psce, design = ~ stim * cell)
-glm_de <- glmGamPoi::test_de(glm_fit, contrast = cond(stim = "stim", cell = "B cells") - cond(stim = "ctrl", cell = "B cells"))
-glm_de |>
-  arrange(pval) |>
-  head()
+#| label: fig-lemur_plot_de-2
+#| message: false
+#| fig-cap: "Counterfactual: `lemur` predicts _PLSCR1_ differential expression between control and stimulus for each cell"
+#| fig-width: 5
+#| fig-height: 5
+ggplscr1 + geom_point(aes(colour = de), size = 0.2) +
+   scale_colour_continuous(
+     limits = c(-1, 1) * 1.5,
+     oob = scales::squish,
+     palette = grDevices::colorRampPalette(RColorBrewer::brewer.pal(11, "RdBu")[rev(c(1:5, 6, 6, 6, 6, 7:11))])(256)
+   )
 ```
-:::
 
-::: {.callout-note collapse="true"}
-## Challenge: For each cell type compare the `lemur` predictions against the observed expression of a gene:
-
-We use the `pseudobulk` function from `glmGamPoi` to calculate the average expression and latent embedding position per condition and cell type. The mean embedding and `colData` is then fed to the `predict` function of `lemur`.
-
-```{r, paged.print=FALSE}
-#| label: glmGamPoi_vs_lemur2
-
-# You could choose any gene
-gene_oi <- "HERC5"
-
-reduced_fit <- glmGamPoi::pseudobulk(fit, group_by = vars(stim, cell))
-lemur_pred_per_cell <- predict(fit, newdata = colData(reduced_fit), embedding = t(reducedDim(reduced_fit, "embedding")))
-
-as_tibble(colData(reduced_fit)) |>
-  mutate(obs = logcounts(reduced_fit)[gene_oi,]) |>
-  mutate(lemur_pred =  lemur_pred_per_cell[gene_oi,]) |>
-  ggplot(aes(x = obs, y = lemur_pred)) +
-    geom_abline() +
-    geom_point(aes(colour = stim)) +
-    labs(title = "`lemur` predictions averaged per cell type and condition")
-```
-:::
 
 ## Neighborhood identification (Step 3) and differential expression tests (Step 4)
 
@@ -677,10 +642,12 @@ print(p_spectrum)
 
 For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
 
-# Appendix: variations and extensions to the workflow {#sec-appendix}
+# Appendix: Variations and extensions to the workflow {#sec-appendix}
+
+## Preprocessing
 
 ::: {.callout-note collapse="true"}
-## Above, we used the logarithm transformation as implemented in `scrapper::normalizeRnaCounts.se`. How would you do a Pearson residuals transformation (like `SCTransform` in `Seurat`)?
+### Above, we used the logarithm transformation as implemented in `scrapper::normalizeRnaCounts.se`. How would you do a Pearson residuals transformation (like `SCTransform` in `Seurat`)?
 
 In addition to calling `Seurat`'s `SCTransform`, you can use the [transformGamPoi](https://bioconductor.org/packages/release/bioc/vignettes/transformGamPoi/inst/doc/transformGamPoi.html) package from Bioconductor:
 
@@ -697,7 +664,7 @@ assay(sce, "pearson_residuals") <- transformGamPoi::residual_transform(sce, resi
 :::
 
 ::: {.callout-note collapse="true"}
-## What is the problem with using too few components for PCA? Is there also a problem with using too many?
+### What is the problem with using too few components for PCA? Is there also a problem with using too many?
 
 Too few dimensions for PCA mean that it cannot capture enough of the relevant variation in the data. This leads to a loss of subtle differences between cell states.
 
@@ -705,7 +672,7 @@ Too many dimensions for PCA can also pose a problem. The objective of doing PCA 
 :::
 
 ::: {.callout-note collapse="true"}
-## How can you use tSNE instead of UMAP? What are alternative visualization methods?
+### How can you use tSNE instead of UMAP? What are alternative visualization methods?
 
 The scater package also provides a `runTSNE` function
 
@@ -724,7 +691,7 @@ On one hand, tSNE and UMAP are widely used for visualizing the cell type and sta
 :::
 
 ::: {.callout-note collapse="true"}
-## Preprocessing alternative: do the preprocessing of the data with Seurat
+### Preprocessing alternative: do the preprocessing of the data with Seurat
 
 The following code is based on the Seurat [*Guided Clustering Tutorial*](https://satijalab.org/seurat/archive/v3.0/pbmc3k_tutorial.html).
 
@@ -751,8 +718,51 @@ Seurat::DimPlot(seur_obj, reduction = "umap", group.by = "stim")
 ```
 :::
 
+## Pseudobulk analyses
 
-## More on data integration
+::: {.callout-note collapse="true"}
+### Calculate the differential expression for each cell type using [glmGamPoi](https://bioconductor.org/packages/release/bioc/vignettes/glmGamPoi/inst/doc/pseudobulk.html).
+
+`glmGamPoi` is a differential expression tool inspired by `edgeR` and `DESeq2` that is specifically designed for single cell RNA-seq data.
+
+```{r}
+#| label: glmGamPoi_de_test
+psce <- glmGamPoi::pseudobulk(fit, group_by = vars(cell, ind, stim))
+# Filter out NAs
+psce <- psce[,! is.na(psce$cell)]
+glm_fit <- glmGamPoi::glm_gp(psce, design = ~ stim * cell)
+glm_de <- glmGamPoi::test_de(glm_fit, contrast = cond(stim = "stim", cell = "B cells") - cond(stim = "ctrl", cell = "B cells"))
+glm_de |>
+  arrange(pval) |>
+  head()
+```
+:::
+
+::: {.callout-note collapse="true"}
+### For each cell type compare the `lemur` predictions against the observed expression of a gene:
+
+We use the `pseudobulk` function from `glmGamPoi` to calculate the average expression and latent embedding position per condition and cell type. The mean embedding and `colData` is then fed to the `predict` function of `lemur`.
+
+```{r, paged.print=FALSE}
+#| label: glmGamPoi_vs_lemur2
+
+# You could choose any gene
+gene_oi <- "HERC5"
+
+reduced_fit <- glmGamPoi::pseudobulk(fit, group_by = vars(stim, cell))
+lemur_pred_per_cell <- predict(fit, newdata = colData(reduced_fit), embedding = t(reducedDim(reduced_fit, "embedding")))
+
+as_tibble(colData(reduced_fit)) |>
+  mutate(obs = logcounts(reduced_fit)[gene_oi,]) |>
+  mutate(lemur_pred =  lemur_pred_per_cell[gene_oi,]) |>
+  ggplot(aes(x = obs, y = lemur_pred)) +
+    geom_abline() +
+    geom_point(aes(colour = stim)) +
+    labs(title = "`lemur` predictions averaged per cell type and condition")
+```
+:::
+
+## Data integration
 
 When we made @fig-kang-umap-1, we discussed that the cells' embedding locations separate strongly both by treatment status and cell type. For many analyses, we would like to overlay the corresponding cells from the stimulated condition with the cells from the control condition. For example, for cell type assignment, we might want to annotate both conditions together, irrespective of treatment. This aspiration is called **integration**. The goal is a mathematical representation (e.g., a low-dimensional embedding) of the cells where the treatment status does not visibly affect the positions overall, and all the visible variance represents different cell types. @fig-integrated_picture shows an example.
 
