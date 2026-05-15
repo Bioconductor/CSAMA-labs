@@ -362,19 +362,15 @@ neighbourhoods_to_adjacency_matrix <- function(x, fit, out = c("matrix", "longda
     cell_names <- union(cell_names, colnames(fit))
   stopifnot(!is.null(nei), !is.null(gene_names), !is.null(cell_names))
   
-  mat <- matrix(
-    FALSE, 
-    nrow = length(cell_names), 
-    ncol = length(gene_names),
-    dimnames = list(cell = cell_names, name = gene_names)
-  )
+  mat <- matrix(0L, nrow = length(cell_names), ncol = length(gene_names),  # integer matrix cells x genes
+                    dimnames = list(cell = cell_names, gene = gene_names))
 
   for (i in seq_along(gene_names))
-    mat[nei[[i]], gene_names[i]] <- TRUE
+    mat[nei[[i]], gene_names[i]] <- as.integer(sign(x$lfc[i]))
   
   switch(out,
-    matrix = mat,
-    longdataframe = as_tibble(as.data.frame.table(mat, responseName = "inside", stringsAsFactors = FALSE))
+    matrix = mat, # signed integer matrix cells x genes
+    longdataframe = as_tibble(as.data.frame.table(mat != 0, responseName = "inside", stringsAsFactors = FALSE))  # logical values
   )
 }
 ```
@@ -384,7 +380,7 @@ Let's redo @fig-find-neighbourhood, but now separately for the cells inside and 
 
 ```{r}
 #| label: neighbourhood-facetted
-cells_inside_df <- neighbourhoods_to_adjacency_matrix(top_did_gene, fit, "longdataframe")
+cells_inside_df <- neighbourhoods_to_adjacency_matrix(top_did_gene, fit, out = "longdataframe")
 
 as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
@@ -414,7 +410,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(de = as_tibble(t(assay(fit, "DE")[slice_min(nei, pval, n = 3)$name,]))) |>
   unpack(de, names_sep = "_") |>
   pivot_longer(starts_with("de_"), names_sep = "_", names_to = c(".value", "gene_name")) |>
-  left_join(cells_inside_df_top3, by = c("gene_name" = "name", "cell_name" = "cell")) |>
+  left_join(cells_inside_df_top3, by = c("gene_name" = "gene", "cell_name" = "cell")) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(colour = de), size = 0.3) +
     mydivergentcolourscale(2) +
@@ -429,8 +425,6 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to go step further and know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. In this step, which was not yet described by @AhlmannEltze:NatGen:2025, we use biclustering to address this question.
 
 We start by observing that the neighbourhoods we discovered above can be visualised as a bipartite graph or as an adjacency matrix. A bipartite graph has two types of nodes, and edges only between nodes of different types. In our case, the nodes are genes and cells, and an edge exists between a cell and a gene if the cell is in the gene's neighbourhood. Let's visualise it.
-
-TO DO: deal with the sign!
 
 ```{r}
 #| label: adjmat
@@ -447,13 +441,13 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 ```
 ```{r}
 #| label: fig-heatmap
-#| fig-width: 10
-#| fig-height: 6
-#| fig-cap: "Adjacency matrix of the bipartite genes - cell graph. Rows: cells, columns: genes. Blue: inside the neighbourhood (there is an edge), yellow: outside (no edge)."
+#| fig-width: 7
+#| fig-height: 10.5
+#| fig-dpi: 180
+#| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Blue: inside the neighbourhood, LFC<0; red: inside the neighbourhood, LFC>0; light yellow: outside (no edge)."
 library("pheatmap")
-pheatmap(adj[sample(nrow(adj), 2500), ] + 0, 
-  color = c("#FFD700", "#0057B7"),
-  show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0, legend = FALSE)
+pheatmap(adj[sample(nrow(adj), 1800), ] + 0,   # random subset to save compute time and since one cannot see more anyway (pixel resolution)
+  show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0)
 ```
 
 Looking at @fig-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret as biological processes or regulatory programmes.
