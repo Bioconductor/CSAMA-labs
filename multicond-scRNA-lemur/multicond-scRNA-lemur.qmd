@@ -245,7 +245,7 @@ If there are no cell type labels present, `lemur` uses a modified version of the
 #| label: align-lemur-model
 #| eval: !expr with(params, execute_answers && execute_align_harmony)
 fit2 <- lemur(sce, design = ~ stim, n_embedding = 30, verbose = FALSE)
-fit2 <- align_harmony(fit2, verbose = FALSE)
+# fit2 <- align_harmony(fit2, verbose = FALSE)
 ```
 :::
 
@@ -447,7 +447,7 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 #| out-width: "75%"
 #| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Blue: inside the neighbourhood, LFC<0; red: inside the neighbourhood, LFC>0; light yellow: outside (no edge)."
 library("pheatmap")
-pheatmap(adj[sample(nrow(adj), 4000), ] + 0,   # random subset to save compute time and since one cannot see more anyway (pixel resolution)
+pheatmap(adj[sample(nrow(adj), 2048), ],   # random subset to save compute time and since one cannot see more anyway (pixel resolution)
   show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0)
 ```
 
@@ -471,6 +471,47 @@ The current version of `lemur` enables manual approximation to this problem usin
 - the repeated intersection approach seems overly stringent / conservative, i.e., it will loose many cells just because they didn't reach a thresholds for one particular gene. I'm hoping for something more like smoothing, literally, finding almost but not perfectly coloured rectangles in @fig-adj-heatmap
 :::
 
+
+```{r}
+#| label: svdnmf
+#| message: false
+# many variations of this possible: e.g. do separately for positive (up-regulated) and negative (down-regulated) neighbourhoods, rather than taking abs
+set.seed(0xdada)
+j = 1
+adjsvd  <- irlba::irlba(abs(adj))
+adj_1 <- with(adjsvd, u[, j, drop = FALSE] %*% t(v[, j, drop = FALSE]) * d[j])
+
+adjnmf <- RcppML::nmf(abs(adj), k = 3)
+adj_2 <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])
+```
+```{r}
+#| label: fig-hist-nmfweights
+#| layout-ncol: 2
+#| echo: true
+#| eval: true
+j = 1
+ggplot(tibble(w = adjnmf$w[, j]), aes(x = w)) + geom_histogram(bins = 100)
+ggplot(tibble(h = adjnmf$h[j, ]), aes(x = h)) + geom_histogram(bins = 30)
+```
+
+```{r}
+#| label: fig-component1-heatmap
+#| fig-width: 5
+#| fig-height: 7
+#| out-width: "75%"
+#| fig-cap: "Bicluster constructed from the first column of the NMF of `adj`."
+bic_genes = adjnmf$h[j, ] > 0.002 # could automate this using 2-component mixture model or k-means with k=2
+bic_cells = adjnmf$w[, j] > 0.00012 
+table(bic_genes)
+table(bic_cells)
+csamp = sample(nrow(adj), 2048)
+pheatmap(abs(adj[csamp, ]), show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0,
+         annotation_row = data.frame(inside = bic_cells[csamp] + 0, row.names = rownames(adj)[csamp]),
+         annotation_col = data.frame(inside = bic_genes + 0, row.names = colnames(adj))
+)
+```
+
+**TO DO** plot the heatmap ordered by inside first
 
 ```{r}
 top_gene <- slice_min(nei, did_pval, n = 1, with_ties = FALSE)
