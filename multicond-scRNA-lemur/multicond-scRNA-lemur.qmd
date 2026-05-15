@@ -426,12 +426,10 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 ## Step 5: Simultaneous clustering of genes and cells (biclustering)
 
-So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. 
+So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. In this step, which was not yet described by @AhlmannEltze:NatGen:2025, we use biclustering to address this question.
 
-TO DO: 
+In our case, the matrix is the adjacency of a bipartite graph, the graph whose nodes are genes and cells, and an edges exists between a cell and a gene if the cell is in the gene's neighbourhood.
 
-- use `neighbourhoods_to_adjacency_matrix` to explain the bipartite graph and the adjacency matrix.
-- let's find a better name than master neighbourhood
 
 ```{r}
 #| label: adjmat
@@ -441,6 +439,8 @@ dim(adj)
 ```{r}
 #| label: fig-hist-rowsums-adjmat
 #| layout-ncol: 2
+#| echo: false
+#| eval: false
 ggplot(tibble(rs = rowSums(adj)), aes(x = rs)) + geom_histogram(bins = 100)
 ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 ```
@@ -448,22 +448,26 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 #| label: fig-heatmap
 #| fig-width: 10
 #| fig-height: 6
-#| fig-cap: "Adjacency matrix. Rows:cells, columns: genes"
+#| fig-cap: "Adjacency matrix. Rows: cells, columns: genes. Blue: inside the neighbourhood, yellow: outside"
 library("pheatmap")
 pheatmap(adj[sample(nrow(adj), 2500), ] + 0, 
-  show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0)
+  color = c("#FFD700", "#0057B7"),
+  show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0, legend = FALSE)
 ```
 
-Thus, we can do bi- or co-clustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
+Thus, we can do bi- or coclustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
 
 ::: {.callout-warning collapse="false"}
-## Definition
-Biclustering or Coclustering is a data analysis technique that simultaneously groups both rows and columns of a matrix to identify subsets of features that exhibit coherent patterns within subsets of samples. Unlike traditional clustering, which clusters either rows or columns independently across all data, biclustering discovers local patterns by identifying groups of rows that behave similarly only across specific groups of columns. Thus, a bicluster is a submatrix whose rows and columns jointly satisfy a coherence criterion.
+## Biclustering
+[Biclustering or coclustering](https://en.wikipedia.org/wiki/Biclustering) is a data analysis technique that simultaneously groups both rows and columns of a matrix to identify subsets of rows that exhibit coherent patterns within subsets of columns. 
 :::
 
 A dedicated pipeline for biclustering of `lemur` predictions is currently in development and will be released in the near future. This approach is based on a sparse matrix decomposition of the lemur differential expression followed by a discrete recruitment strategy to assign cells and genes to _multiple_ biclusters at the same time and in an unsupervised fashion -- genes can be part of multiple response programmes, and cells can respond to condition changes through the expression of multiple different programmes. Biclusters can be rated based on reproducibility and coherence of the bicluster submatrix.
 
 The current version of `lemur` already allows for a manual approximation to this problem using the neighbourhoods identified in the previous step. As a reference, we again take the top expressed gene and its associated cell neighbourhood. Then, we compare this neighbourhood to all other significant neighbourhoods found. The similarity of these neighbourhoods can be quantified using the Jaccard index $J(A, B)={|A \cap B|}/{|A \cup B|}$, which measures the similarity of two sets.
+
+TODO: - let's find a better name than master neighbourhood
+
 
 ```{r}
 top_gene <- slice_min(nei, did_pval, n = 1, with_ties = FALSE)
@@ -893,7 +897,7 @@ int_mat <- t(ref_pca$rotation) %*% centered_mat
 
 ## Harmony
 
-Harmony is one popular tool for data integration [@korsunsky2019]. Harmony is relatively fast and can handle more complex experimental designs than just a treatment/control setup. It is built around _maximum diversity clustering_ (@fig-harmony_schematic). Unlike classical clustering algorithms, maximum diversity clustering not just minimizes the distance of each data point to a cluster center but also maximizes the mixing of conditions assigned to each cluster.
+Harmony is a popular tool for data integration [@korsunsky2019]. It is relatively fast and can handle more complex experimental designs than just a treatment/control setup. It is built around _maximum diversity clustering_ (@fig-harmony_schematic). Like many clustering algorithms, maximum diversity clustering aims to minimize the distance of each data point to its respective cluster center, and in addition it also aims to maximize the mixing of conditions (or "batches") assigned to each cluster.
 
 ![Schematic of Harmony. Screenshot from Fig. 1 of @korsunsky2019](images/harmony_schematic.png){#fig-harmony_schematic}
 
