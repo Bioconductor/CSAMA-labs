@@ -401,9 +401,9 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 ::: {.callout-warning collapse="true"}
 ## Brain teaser: How are `lemur` neighbourhoods different from the cluster-based differential expression tests?
 
-The `lemur` neighbourhoods are adaptive to the underlying expression patterns for each gene. This means that they provide optimal power to detect differential expression as well the set of cells for which the gene expression changes most.
+The `lemur` neighbourhoods are adaptive to the underlying expression patterns for each gene. This means that they detect differential expression not just for a predefined set of cells, but for that set of cells for which the gene expression changes most consistently.
 
-The plot below illustrates this for the top three DE genes by `pval` which all have very different neighbourhoods. Note that the neighbourhoods are convex in the low-dimensional embedding space, even though in the UMAP embedding they might not look like it. This is due to the non-linear nature of the UMAP dimensionality reduction.
+The plot below illustrates this for the top three DE genes by `pval`, which all have very different neighbourhoods. Note that the neighbourhoods are convex in the low-dimensional embedding space, even though in the UMAP embedding they might not look like it. This is due to the non-linear nature of the UMAP dimensionality reduction.
 
 ```{r}
 #| label: neighbourhood-facetted-top3
@@ -426,10 +426,11 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 ## Step 5: Simultaneous clustering of genes and cells (biclustering)
 
-So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. In this step, which was not yet described by @AhlmannEltze:NatGen:2025, we use biclustering to address this question.
+So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to go step further and know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. In this step, which was not yet described by @AhlmannEltze:NatGen:2025, we use biclustering to address this question.
 
-In our case, the matrix is the adjacency of a bipartite graph, the graph whose nodes are genes and cells, and an edges exists between a cell and a gene if the cell is in the gene's neighbourhood.
+We start by observing that the neighbourhoods we discovered above can be visualised as a bipartite graph or as an adjacency matrix. A bipartite graph has two types of nodes, and edges only between nodes of different types. In our case, the nodes are genes and cells, and an edge exists between a cell and a gene if the cell is in the gene's neighbourhood. Let's visualise it.
 
+TO DO: deal with the sign!
 
 ```{r}
 #| label: adjmat
@@ -448,14 +449,14 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 #| label: fig-heatmap
 #| fig-width: 10
 #| fig-height: 6
-#| fig-cap: "Adjacency matrix. Rows: cells, columns: genes. Blue: inside the neighbourhood, yellow: outside"
+#| fig-cap: "Adjacency matrix of the bipartite genes - cell graph. Rows: cells, columns: genes. Blue: inside the neighbourhood (there is an edge), yellow: outside (no edge)."
 library("pheatmap")
 pheatmap(adj[sample(nrow(adj), 2500), ] + 0, 
   color = c("#FFD700", "#0057B7"),
   show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0, legend = FALSE)
 ```
 
-Thus, we can do bi- or coclustering on this differential expression matrix allows us to identify neighbourhoods of cells that show coherent up- or downregulation of entire sets of genes, i.e. gene programmes.
+Looking at @fig-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret as biological processes or regulatory programmes.
 
 ::: {.callout-warning collapse="false"}
 ## Biclustering
