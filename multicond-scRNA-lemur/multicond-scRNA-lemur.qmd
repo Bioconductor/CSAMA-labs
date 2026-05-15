@@ -442,9 +442,9 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 ```
 ```{r}
 #| label: fig-adj-heatmap
-#| fig-width: 6
-#| fig-height: 9
-#| fig-dpi: 180
+#| fig-width: 5
+#| fig-height: 7
+#| out-width: "75%"
 #| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Blue: inside the neighbourhood, LFC<0; red: inside the neighbourhood, LFC>0; light yellow: outside (no edge)."
 library("pheatmap")
 pheatmap(adj[sample(nrow(adj), 4000), ] + 0,   # random subset to save compute time and since one cannot see more anyway (pixel resolution)
@@ -465,7 +465,7 @@ The current version of `lemur` enables manual approximation to this problem usin
 
 ::: {.callout-note collapse="false"}
 ## Questions to Tim 
-- Let's find a better name than _master neighbourhood_ (sounds like something from colonial times Africa; or this <https://claude.ai/share/e03f45ee-cf4c-4653-bc2e-3db1a9e6b0a5>). [I then asked the chatbot for suggestions.](https://claude.ai/share/b582b251-d02f-4e64-a4a4-4f7a9f65afbe) Shall we just go for "bicluster of cells" and "bicluster of genes"? I think the name "neighbourhood" confuses many people, is too abstract.
+- Let's find a better name than _master neighbourhood_ (sounds like something from colonial times Africa or America; see also <https://claude.ai/share/e03f45ee-cf4c-4653-bc2e-3db1a9e6b0a5>). I then [asked the chatbot for suggestions](https://claude.ai/share/b582b251-d02f-4e64-a4a4-4f7a9f65afbe). Shall we just go for "bicluster of cells" and "bicluster of genes"? I think the name "neighbourhood" confuses many people, anyway, it is too abstract, it's one of the mistakes of the existing paper.
 - Above, you say "sparse matrix decomposition of the adjacency matrix", but the matrix does not seem to be very sparse, once you select genes with a "significant" neighbourhood. Should we not rather talk about _approximation with a low rank matrix_, rather than sparsity?]
 - what about signs? your Jaccard approach seems to not use them. Not sure the Euclidean distance used by `pheatmap` (in @fig-adj-heatmap) is fundamentally better, but it does take sign into account.
 - the repeated intersection approach seems overly stringent / conservative, i.e., it will loose many cells just because they didn't reach a thresholds for one particular gene. I'm hoping for something more like smoothing, literally, finding almost but not perfectly coloured rectangles in @fig-adj-heatmap
