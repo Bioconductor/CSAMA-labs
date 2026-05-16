@@ -432,6 +432,15 @@ We start by observing that the neighbourhoods we discovered above can be visuali
 adj <- neighbourhoods_to_adjacency_matrix(dplyr::filter(nei, adj_pval < 0.15), fit, out = "matrix")
 dim(adj)
 ```
+
+The conversion from the `nei` object to the adjacency matrix `adj` has lost / garbled the original order of cells in the `sce` data object. For comparisons below, and to avoid bugs, we align the orders.
+
+```{r}
+#| label: syncorder
+stopifnot(setequal(colnames(sce), rownames(adj)))
+adj = adj[colnames(sce), ]
+```
+
 ```{r}
 #| label: fig-hist-rowsums-adjmat
 #| layout-ncol: 2
@@ -574,13 +583,28 @@ We can now revisit @fig-lemur-umap-celltypes and compare it with our bicluster.
 #| fig-cap: 
 #|   - Same as @fig-lemur-umap-celltypes
 #|   - The `j`-th bicluster
+ord <- order(bic_cells)
+gglem <- as_tibble(colData(sce)) |>
+  mutate(
+    umap = lemur_umap,
+    bic = bic_cells) |>
+  arrange(bic) |>    
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
+
 gglem + geom_point(aes(colour = cell), size = 0.3) 
-gglem + geom_point(colour = mycolours[as.character(bic_cells)], size = 0.3) 
+gglem + geom_point(aes(colour = bic), size = 0.3) + scale_colour_discrete(palette = mycolours)
+```
+
+```{r}
+#| label: fig-table-celltype-bic
+#| fig-width: 5
+#| fig-height: 5.5
+#| fig-cap: "Cell type annotations versus membership in bicluster `j`."
+plot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), main = "", las = 2)
 ```
 
 TO DO:
 
-- Why does @fig-bicluster-and-celltypes not show a clearer pattern? Is it better for other biclusters? Should we do it sign-specific (without `abs`) instead?
 - Do gene set enrichment / hallmarks on the genes
 
 ```{r}
