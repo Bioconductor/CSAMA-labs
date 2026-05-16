@@ -472,7 +472,9 @@ Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure
 
 A dedicated package for biclustering of `lemur` predictions is currently under development by the authors of this lab, and we aim to release it soon. The approach is based on a sparse matrix decomposition of the adjacency matrix (as in @fig-adj-heatmap) followed by an algorithm to assign cells and genes to biclusters, designed such that a cell or a gene can be part of _multiple_  biclusters. This is motivated by the biological observation that a gene can contribute to multiple biological processes, and cells can respond to condition changes through up- or downregulation of multiple programmes. 
 
+<!--
 The current version of `lemur` enables manual approximation to this problem using the neighbourhoods identified in the previous step. As a reference, we again take the top expressed gene and its associated cell neighbourhood. Then, we compare this neighbourhood to all other significant neighbourhoods found. The similarity of these neighbourhoods can be quantified using the Jaccard index $J(A, B)={|A \cap B|}/{|A \cup B|}$, which measures the similarity of two sets.
+-->
 
 ::: {.callout-note collapse="false"}
 ## Questions to Tim 
