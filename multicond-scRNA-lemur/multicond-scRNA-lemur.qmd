@@ -471,16 +471,19 @@ A dedicated package for biclustering of `lemur` predictions is currently under d
 
 The current version of `lemur` enables manual approximation to this problem using the neighbourhoods identified in the previous step. As a reference, we again take the top expressed gene and its associated cell neighbourhood. Then, we compare this neighbourhood to all other significant neighbourhoods found. The similarity of these neighbourhoods can be quantified using the Jaccard index $J(A, B)={|A \cap B|}/{|A \cup B|}$, which measures the similarity of two sets.
 
-
 ::: {.callout-note collapse="false"}
 ## Questions to Tim 
 - Let's find a better name than _master neighbourhood_ (sounds like something from colonial times Africa or America; see also <https://claude.ai/share/e03f45ee-cf4c-4653-bc2e-3db1a9e6b0a5>). I then [asked the chatbot for suggestions](https://claude.ai/share/b582b251-d02f-4e64-a4a4-4f7a9f65afbe). Shall we just go for "bicluster of cells" and "bicluster of genes"? I think the name "neighbourhood" confuses many people, anyway, it is too abstract, it's one of the mistakes of the existing paper.
 - Above, you say "sparse matrix decomposition of the adjacency matrix", but the matrix does not seem to be very sparse, once you select genes with a "significant" neighbourhood. Should we not rather talk about _approximation with a low rank matrix_; or perhaps _low rank approximation with SVD or NMF using sparse components_?
 - The repeated intersection approach seems overly stringent / conservative, i.e., it will loose many cells just because they didn't reach a thresholds for one particular gene. I'm hoping for something more like smoothing, literally, finding almost but not perfectly coloured rectangles in @fig-adj-heatmap. More generally, I think your greedy recruitment below is (with all respect) just another clustering algorithm. There are already millions of clustering algorithms, I think one needs a pretty strong argument for inventing a new one. For now, I'd prefer getting the (sparse?) SVD or NMF approach to work.
 - What about signs? your Jaccard approach seems to not use them. Not sure the Euclidean distance used by `pheatmap` (in @fig-adj-heatmap) is fundamentally better, but it does take sign into account.
+- The current approach of finding "neighbourhoods" for each gene with the random projections, and then biclustering... -- Can the biclustering idea already be integrated earlier on?
 :::
 
-Many variations of what happens in the next code chunk are possible: e.g., one could do the matrix decompositions separately for the positive (up-regulated) and negative (down-regulated) neighbourhoods, rather than taking the absolute value of `abs(adj)`.
+Many variations of what happens in the next code chunk are possible: 
+
+1. Choice between singular value decomposition (SVD; for which we below use the `irlba` method from the eponymous package) or non-negative matrix factorization (NMF).
+2. Whether to do the matrix decompositions separately for the positive (up-regulated) and negative (down-regulated) neighbourhoods, or take the absolute value `abs(adj)`, as we do below. 
 
 ```{r}
 #| label: svdnmf
@@ -606,6 +609,12 @@ plot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), mai
 TO DO:
 
 - Do gene set enrichment / hallmarks on the genes
+
+
+::: {.callout-note collapse="true"}
+## Challenge: Quantifying the coverage of the "biclusters"
+Redo the NMF from above using `k=12` and create a plot like @fig-adj-jn for the linear combination, i.e., visualize the low-rank approximation and compare it to @fig-adj-heatmap.
+:::
 
 ```{r}
 top_gene <- slice_min(nei, did_pval, n = 1, with_ties = FALSE)
