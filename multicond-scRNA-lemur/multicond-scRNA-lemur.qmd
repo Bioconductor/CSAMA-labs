@@ -466,27 +466,27 @@ The current version of `lemur` enables manual approximation to this problem usin
 ::: {.callout-note collapse="false"}
 ## Questions to Tim 
 - Let's find a better name than _master neighbourhood_ (sounds like something from colonial times Africa or America; see also <https://claude.ai/share/e03f45ee-cf4c-4653-bc2e-3db1a9e6b0a5>). I then [asked the chatbot for suggestions](https://claude.ai/share/b582b251-d02f-4e64-a4a4-4f7a9f65afbe). Shall we just go for "bicluster of cells" and "bicluster of genes"? I think the name "neighbourhood" confuses many people, anyway, it is too abstract, it's one of the mistakes of the existing paper.
-- Above, you say "sparse matrix decomposition of the adjacency matrix", but the matrix does not seem to be very sparse, once you select genes with a "significant" neighbourhood. Should we not rather talk about _approximation with a low rank matrix_, rather than sparsity?]
-- what about signs? your Jaccard approach seems to not use them. Not sure the Euclidean distance used by `pheatmap` (in @fig-adj-heatmap) is fundamentally better, but it does take sign into account.
-- the repeated intersection approach seems overly stringent / conservative, i.e., it will loose many cells just because they didn't reach a thresholds for one particular gene. I'm hoping for something more like smoothing, literally, finding almost but not perfectly coloured rectangles in @fig-adj-heatmap
+- Above, you say "sparse matrix decomposition of the adjacency matrix", but the matrix does not seem to be very sparse, once you select genes with a "significant" neighbourhood. Should we not rather talk about _approximation with a low rank matrix_; or perhaps _low rank approximation with SVD or NMF using sparse components_?
+- The repeated intersection approach seems overly stringent / conservative, i.e., it will loose many cells just because they didn't reach a thresholds for one particular gene. I'm hoping for something more like smoothing, literally, finding almost but not perfectly coloured rectangles in @fig-adj-heatmap. More generally, I think your greedy recruitment below is (with all respect) just another clustering algorithm. There are already millions of clustering algorithms, I think one needs a pretty strong argument for inventing a new one. For now, I'd prefer getting the (sparse?) SVD or NMF approach to work.
+- That about signs? your Jaccard approach seems to not use them. Not sure the Euclidean distance used by `pheatmap` (in @fig-adj-heatmap) is fundamentally better, but it does take sign into account.
 :::
 
-Many variations of what happens in the next code chunk are possible: e.g., could do the matrix decompositions separately for the positive (up-regulated) and negative (down-regulated) neighbourhoods, rather than taking the absolute value of `abs(adj)`.
+Many variations of what happens in the next code chunk are possible: e.g., one could do the matrix decompositions separately for the positive (up-regulated) and negative (down-regulated) neighbourhoods, rather than taking the absolute value of `abs(adj)`.
 
 ```{r}
 #| label: svdnmf
 #| message: false
 set.seed(0xdada)
-j = 1
+j <- 1
 adjsvd <- irlba::irlba(abs(adj))
 adj_js <- with(adjsvd, u[, j, drop = FALSE] %*% t(v[, j, drop = FALSE]) * d[j])
 
-adjnmf <- RcppML::nmf(abs(adj), k = 3, verbose = FALSE)
+adjnmf <- RcppML::nmf(abs(adj), k = 5, verbose = FALSE)
 adj_jn <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])  # the matrix approximation from the j-th NMF component
 ```
 
 ::: {.callout-note collapse="true"}
-## Plot `adj_jn`, i.e., the matrix spanned by the `j`-th NMF component `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
+## Plot `adj_jn`, i.e., the matrix spanned by the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
 ```{r}
 #| label: fig-adj-jn
 #| fig-width: 5
@@ -499,8 +499,7 @@ pheatmap(adj_jn[cells_sample, ][order(adjnmf$w[cells_sample, j]), order(adjnmf$h
          color = colorRampPalette(rev(RColorBrewer::brewer.pal(9, "Blues")))(100))
 ```
 Note that here we use a [sequential colour map rather than a diverging](https://www.huber.embl.de/msmb/03-chap.html#sec-graphics-color) one, since the values are all positive.
-To order the rows and columns in this plots, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering.
-We also need to do some extra index gymnastics to keep track of the random subsampling of `r length(cells_sample)` rows for plotting.
+To order the rows and columns in this plot, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering. We also need to do some extra index gymnastics to keep track of the random subsampling of `r length(cells_sample)` rows for plotting.
 
 Bonus: produce similar plots for other values of `j`.
 :::
@@ -515,37 +514,68 @@ Bonus: produce similar plots for other values of `j`.
 #| fig-cap: 
 #|   - "Distribution of NMF coefficients: w"
 #|   - "Distribution of NMF coefficients: h"
-j = 1
+j <- 1
 ggplot(tibble(w = adjnmf$w[, j]), aes(x = w)) + geom_histogram(bins = 100)
 ggplot(tibble(h = adjnmf$h[j, ]), aes(x = h)) + geom_histogram(bins = 30)
 ```
 :::
 
-Let's pick a bicluster. The choice of the thresholds is motivated by the histograms above. One could automate this, e.g., using a two-component mixture model or $k$-means with $k=2$.
+Let's pick a bicluster. The choice of the thresholds can be motivated by the histograms above. Here we automate this by fitting a two-component mixture model with the $k$-means algorithm with $k=2$, and taking the midpoint.
 
 ```{r}
 #| label: pick-bicluster
-threshold = c(h = 0.002, w = 0.00012)
-bic_genes = adjnmf$h[j, ] > threshold["h"]
-bic_cells = adjnmf$w[, j] > threshold["w"]  
-table(bic_genes)
-table(bic_cells)
-cells_sample = sample(nrow(adj), 2048)
-adj_sample_abs = abs(adj[cells_sample, ])
+find_threshold <- function(x) {
+  mean(kmeans(x, centers = 2)$centers)
+}
+threshold_h <- find_threshold(adjnmf$h[j, ])
+threshold_w <- find_threshold(adjnmf$w[, j])
+c(threshold_h, threshold_w )
+bic_genes = adjnmf$h[j, , drop = FALSE] > threshold_h
+bic_cells = adjnmf$w[, j, drop = FALSE] > threshold_w  
 ```
 
+::: {.callout-note collapse="true"}
+## How many genes and cells are selected for this bicluster?
+```{r}
+#| label: tablebic
+table(bic_genes)
+table(bic_cells)
+```
+:::
 
-**TO DO** plot the heatmap ordered by inside first
+Now we are able to visualize this bicluster on top of a heatmap like in @fig-adj-heatmap. Note that while @fig-adj-heatmap distinguishes between -1 and +1 for indicating neighbourhoods in which the gene is down- or up-regulated, we have here chosen to do the NMF on the absolute values. Most of the code below is for ordering the rows and columns of the matrix by whether they are inside or outside the bicluster, and then, by dendrogram order from a hierarchical clustering (which is the default in `pheatmap`, and thus happened for @fig-adj-heatmap). There is also some additional index gymnastics with `csub` to randomly subset rows for visualization, to save computation time. The blue-yellow bars at the sides of the matrix indicate membership in our bicluster (`j=``r j`).
+
 ```{r}
 #| label: fig-component1-heatmap
 #| fig-width: 5
 #| fig-height: 7
 #| out-width: "75%"
-#| fig-cap: "The matrix approximation from the j-th NMF component"
-#pheatmap(adj_sample_abs[row_order, col_order], show_rownames = FALSE, show_colnames = FALSE, cluster_rows = FALSE, cluster_cols = FALSE,
-#         annotation_row = data.frame(inside = bic_cells[csamp] + 0, row.names = rownames(adj)[csamp]),
-#         annotation_col = data.frame(inside = bic_genes + 0, row.names = colnames(adj))
-#)
+#| fig-cap: ""
+csub = sample(nrow(adj), 2048)
+LARGE = 10
+mat_for_plotting = abs(adj)[csub, ] 
+mat_for_ordering = mat_for_plotting + LARGE * (bic_cells[csub, , drop = FALSE] %*% bic_genes)
+row_order = order.dendrogram(as.dendrogram(hclust(dist(  mat_for_ordering ))))
+col_order = order.dendrogram(as.dendrogram(hclust(dist(t(mat_for_ordering)))))
+mycolours = c(`FALSE`= "#FFD700", `TRUE` = "#0057B7")
+pheatmap(mat_for_plotting[row_order, col_order],
+   show_rownames = FALSE, show_colnames = FALSE, cluster_rows = FALSE, cluster_cols = FALSE,
+   annotation_row = data.frame(inside = bic_cells[csub] + 0,      row.names = rownames(mat_for_plotting)),
+   annotation_col = data.frame(inside = as.vector(bic_genes) + 0, row.names = colnames(mat_for_plotting)),
+   color = mycolours,
+   annotation_color = list(inside = mycolours)
+)
+```
+
+We can now revisit @fig-lemur-umap-celltypes and compare it with our bicluster.
+```{r}
+#| label: fig-bicluster-and-celltypes
+#| layout-ncol: 2
+#| fig-cap: 
+#|   - Same as @fig-lemur-umap-celltypes
+#|   - The `j`-th bicluster
+gglem + geom_point(aes(colour = cell), size = 0.3) 
+gglem + geom_point(colour = mycolours[as.character(bic_cells)], size = 0.3) 
 ```
 
 ```{r}
