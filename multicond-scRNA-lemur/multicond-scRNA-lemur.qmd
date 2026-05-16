@@ -479,32 +479,42 @@ Many variations of what happens in the next code chunk are possible: e.g., could
 set.seed(0xdada)
 j = 1
 adjsvd <- irlba::irlba(abs(adj))
-adj_js  <- with(adjsvd, u[, j, drop = FALSE] %*% t(v[, j, drop = FALSE]) * d[j])
+adj_js <- with(adjsvd, u[, j, drop = FALSE] %*% t(v[, j, drop = FALSE]) * d[j])
 
 adjnmf <- RcppML::nmf(abs(adj), k = 3, verbose = FALSE)
-adj_jn  <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])  # the matrix approximation from the j-th NMF component
+adj_jn <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])  # the matrix approximation from the j-th NMF component
 ```
 
-::: {.callout-question collapse="true"}
-Plot `adj_jn`, i.e., the matrix spanned by the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
+::: {.callout-note collapse="true"}
+## Plot `adj_jn`, i.e., the matrix spanned by the `j`-th NMF component `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
 ```{r}
 #| label: fig-adj-jn
 #| fig-width: 5
 #| fig-height: 7
-#| out-width: "75%"
+#| out-width: "50%"
 #| fig-cap: "The matrix approximation from the j-th NMF component"
-pheatmap(adj_jn[sample(nrow(adj_jn), 2048), ], show_rownames = FALSE, show_colnames = FALSE, , treeheight_row = 0, treeheight_col = 0)
+cells_sample = sample(nrow(adj), 2048)
+pheatmap(adj_jn[cells_sample, ][order(adjnmf$w[cells_sample, j]), order(adjnmf$h[j, ])],
+         show_rownames = FALSE, show_colnames = FALSE, cluster_rows = FALSE, cluster_cols = FALSE,
+         color = colorRampPalette(rev(RColorBrewer::brewer.pal(9, "Blues")))(100))
 ```
+Note that here we use a [sequential colour map rather than a diverging](https://www.huber.embl.de/msmb/03-chap.html#sec-graphics-color) one, since the values are all positive.
+To order the rows and columns in this plots, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering.
+We also need to do some extra index gymnastics to keep track of the random subsampling of `r length(cells_sample)` rows for plotting.
+
+Bonus: produce similar plots for other values of `j`.
 :::
 
-::: {.callout-question collapse="true"}
-Plot the histograms of the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`.
+::: {.callout-note collapse="true"}
+## Plot the histograms of the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`.
 ```{r}
 #| label: fig-hist-nmfweights
 #| layout-ncol: 2
 #| echo: true
 #| eval: true
-#| fig-cap: "Distribution of NMF coefficients"
+#| fig-cap: 
+#|   - "Distribution of NMF coefficients: w"
+#|   - "Distribution of NMF coefficients: h"
 j = 1
 ggplot(tibble(w = adjnmf$w[, j]), aes(x = w)) + geom_histogram(bins = 100)
 ggplot(tibble(h = adjnmf$h[j, ]), aes(x = h)) + geom_histogram(bins = 30)
