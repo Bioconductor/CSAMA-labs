@@ -555,7 +555,7 @@ table(bic_cells)
 ```
 :::
 
-Now we are able to visualize this bicluster on top of a heatmap like in @fig-adj-heatmap. Note that while @fig-adj-heatmap distinguishes between -1 and +1 for indicating neighbourhoods in which the gene is down- or up-regulated, we have here chosen to do the NMF on the absolute values. Most of the code below is for ordering the rows and columns of the matrix by whether they are inside or outside the bicluster, and then, by dendrogram order from a hierarchical clustering (which is the default in `pheatmap`, and thus happened for @fig-adj-heatmap). There is also some additional index gymnastics with `csub` to randomly subset rows for visualization, to save computation time. The blue-yellow bars at the sides of the matrix indicate membership in our bicluster (`j=``r j`).
+Now we are able to visualize this bicluster on top of a heatmap like in @fig-adj-heatmap. Note that while @fig-adj-heatmap distinguishes between -1 and +1 for indicating neighbourhoods in which the gene is down- or up-regulated, we have here chosen to do the NMF on the absolute values. Most of the code below is for ordering the rows and columns of the matrix first, by whether they are inside or outside the bicluster, and second, by dendrogram order from a hierarchical clustering (which is the default in `pheatmap`, and thus happened for @fig-adj-heatmap). There is also some additional index gymnastics with `csub` to randomly subset rows for visualization, to save computation time. The blue-yellow bars at the sides of the matrix indicate membership in our bicluster (`j=``r j`).
 
 ```{r}
 #| label: fig-component1-heatmap
