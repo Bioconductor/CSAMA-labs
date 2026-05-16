@@ -454,7 +454,7 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 #| fig-width: 5
 #| fig-height: 7
 #| out-width: "75%"
-#| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Blue: inside the neighbourhood, LFC<0; red: inside the neighbourhood, LFC>0; light yellow: outside (no edge)."
+#| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Blue: inside the neighbourhood, LFC<0; red: inside the neighbourhood, LFC>0; light grey: outside (no edge)."
 library("pheatmap")
 pheatmap(adj[sample(nrow(adj), 2048), ],   # random subset to save compute time and since one cannot see more anyway (pixel resolution)
   color = RColorBrewer::brewer.pal(n = 9, name = "RdBu")[c(9, 5, 1)],
