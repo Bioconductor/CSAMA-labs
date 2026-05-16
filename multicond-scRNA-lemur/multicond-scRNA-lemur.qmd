@@ -620,7 +620,7 @@ TO DO:
 ## Challenge: Quantifying the coverage of the "biclusters"
 Redo the NMF from above using `k=12` and create a plot like @fig-adj-jn for the linear combination, i.e., visualize the low-rank approximation and compare it to @fig-adj-heatmap.
 
-<!-- Below, moving to newer heatmap package called 'ComplexHeatmap' -- maybe should use that above, too?
+<!-- Below, moving to newer heatmap package called 'ComplexHeatmap', and serialization via TSP -- maybe should use that above, too?
      TO DO: 
        - fix colors, make consistent with above. 
        - in the second plot, threshold the bicluster membership to 0/1, and use different colours for each bicluster: 
