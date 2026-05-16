@@ -493,7 +493,7 @@ adj_jn <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])  # t
 #| fig-height: 7
 #| out-width: "50%"
 #| fig-cap: "The matrix approximation from the j-th NMF component"
-cells_sample = sample(nrow(adj), 2048)
+cells_sample <- sample(nrow(adj), 2048)
 pheatmap(adj_jn[cells_sample, ][order(adjnmf$w[cells_sample, j]), order(adjnmf$h[j, ])],
          show_rownames = FALSE, show_colnames = FALSE, cluster_rows = FALSE, cluster_cols = FALSE,
          color = colorRampPalette(rev(RColorBrewer::brewer.pal(9, "Blues")))(100))
@@ -551,13 +551,13 @@ Now we are able to visualize this bicluster on top of a heatmap like in @fig-adj
 #| fig-height: 7
 #| out-width: "75%"
 #| fig-cap: ""
-csub = sample(nrow(adj), 2048)
-LARGE = 10
-mat_for_plotting = abs(adj)[csub, ] 
-mat_for_ordering = mat_for_plotting + LARGE * (bic_cells[csub, , drop = FALSE] %*% bic_genes)
-row_order = order.dendrogram(as.dendrogram(hclust(dist(  mat_for_ordering ))))
-col_order = order.dendrogram(as.dendrogram(hclust(dist(t(mat_for_ordering)))))
-mycolours = c(`FALSE`= "#FFD700", `TRUE` = "#0057B7")
+csub <- sample(nrow(adj), 2048)
+LARGE <- 10
+mat_for_plotting <- abs(adj)[csub, ] 
+mat_for_ordering <- mat_for_plotting + LARGE * (bic_cells[csub, , drop = FALSE] %*% bic_genes)
+row_order <- order.dendrogram(as.dendrogram(hclust(dist(  mat_for_ordering ))))
+col_order <- order.dendrogram(as.dendrogram(hclust(dist(t(mat_for_ordering)))))
+mycolours <- c(`FALSE`= "#FFD700", `TRUE` = "#0057B7")
 pheatmap(mat_for_plotting[row_order, col_order],
    show_rownames = FALSE, show_colnames = FALSE, cluster_rows = FALSE, cluster_cols = FALSE,
    annotation_row = data.frame(inside = bic_cells[csub] + 0,      row.names = rownames(mat_for_plotting)),
@@ -577,6 +577,11 @@ We can now revisit @fig-lemur-umap-celltypes and compare it with our bicluster.
 gglem + geom_point(aes(colour = cell), size = 0.3) 
 gglem + geom_point(colour = mycolours[as.character(bic_cells)], size = 0.3) 
 ```
+
+TO DO:
+
+- Why does @fig-bicluster-and-celltypes not show a clearer pattern? Is it better for other biclusters? Should we do it sign-specific (without `abs`) instead?
+- Do gene set enrichment / hallmarks on the genes
 
 ```{r}
 top_gene <- slice_min(nei, did_pval, n = 1, with_ties = FALSE)
