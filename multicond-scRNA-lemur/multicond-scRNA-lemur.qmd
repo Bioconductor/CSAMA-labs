@@ -602,7 +602,7 @@ gglem + geom_point(aes(colour = bic), size = 0.3) + scale_colour_discrete(palett
 #| label: fig-table-celltype-bic
 #| fig-width: 5
 #| fig-height: 5.5
-#| fig-cap: "Cell type annotations versus membership in bicluster `j`."
+#| fig-cap: "Cell type annotations versus membership in bicluster `j`. How would you biologically interpret this bicluster?"
 plot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), main = "", las = 2)
 ```
 
