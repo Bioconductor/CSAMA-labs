@@ -457,7 +457,10 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 #| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Blue: inside the neighbourhood, LFC<0; red: inside the neighbourhood, LFC>0; light yellow: outside (no edge)."
 library("pheatmap")
 pheatmap(adj[sample(nrow(adj), 2048), ],   # random subset to save compute time and since one cannot see more anyway (pixel resolution)
-  show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0)
+  color = RColorBrewer::brewer.pal(n = 9, name = "RdBu")[c(9, 5, 1)],
+  show_rownames = FALSE, show_colnames = FALSE, treeheight_row = 0, treeheight_col = 0
+)
+
 ```
 
 Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret these as biological processes or regulatory programmes.
