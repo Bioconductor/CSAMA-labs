@@ -611,15 +611,15 @@ plot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), mai
 TO DO:
 
 - Do gene set enrichment / hallmarks on the genes
-- Move the below challenge  Quantifying the coverage of the "biclusters" into the Appendix — and hopefully can serve towards future development of LEMUR2
+- Move the below challenge "Quantifying the coverage of the biclusters" into the Appendix —  hopefully it can serve towards future development of LEMUR2
 
 ::: {.callout-note collapse="true"}
-## Challenge: other biclusters
+## Challenge: Other biclusters
 Redo the above enrichment analysis for cell types and gene pathways for another cluster (another `j`).
 :::
 
 ::: {.callout-note collapse="true"}
-## Challenge: Quantifying the coverage of the "biclusters"
+## Challenge: Looking at the coverage of the biclusters
 Create a plot like @fig-adj-jn for the linear combination of all `r length(adjnmf$d)` factors, i.e.,
 visualize the low-rank (`k=``r length(adjnmf$d)`) approximation and compare it to @fig-adj-heatmap.
 
@@ -795,7 +795,7 @@ We can visually confirm that the identified master neighbourhood indeed shows co
 Note that gene expression need not be restricted to that neighbourhood. Indeed, the intersection approach only guarantees to identify a neighbourhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighbourhoods. This highlights once again the need to identify non-exclusive and non-exhaustive biclusters, since genes can participate in multiple programmes, and programmes themselves can differ across cell neighbourhoods.
 
 ::: {.callout-note collapse="true"}
-## Challenge: Quantifying the coherence of "biclusters"
+## Challenge: Quantifying the coherence of biclusters
 The goal of identifying biclusters and neighbourhoods of co-expression is not only to find genes that are, for example, significantly up- or downregulated within a neighbourhood, but rather to identify genes that show a coherent expression pattern. For example, if there is a gradient of differential expression within that neighbourhood, it would be interesting to see if other genes from the bicluster follow the same trend. In that sense, coherence is a stronger condition than simply averaged regulation over a given neighbourhood.
 
 If all genes are indeed showing perfectly coherent expression, the bicluster submatrix has exactly one axis of variation. In other words, for each cell and gene combination the signal decomposes into a gene and a cell intrinsic part $X_{gc} = G_g C_c$. Equivalently, the submatrix simply has $\mathrm{rank}(X) = 1$.
@@ -805,8 +805,7 @@ This can be quantified using SVD. Let $\sigma_k$ denote the (sorted) singular va
 ```{r, paged.print=FALSE}
 #| label: submatrix-coherence-spectrum
 #| fig-cap: 
-#|   - Spectrum of singular values of the "bicluster" we constructed.
-
+#|   - Spectrum of singular values of the bicluster we constructed.
 X_sub <- assay(fit, "DE")[master_result$genes,
                           master_result$neighborhood,
                           drop = FALSE]
