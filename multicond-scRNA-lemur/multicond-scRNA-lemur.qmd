@@ -571,7 +571,7 @@ LARGE <- 10
 mat <- abs(adj)[csub, ] 
 ser <- seriate(mat + LARGE * (bic_cells[csub, , drop = FALSE] %*% bic_genes), method = "BEA_TSP")
 mycolours <- c(`FALSE` = "#f0f0f0", `TRUE` = "royalBlue4")
-mycolourramp <- colorRamp2(c(0, 1), c("#ffffff", "royalblue2"))
+mycolourramp <- colorRamp2(c(0, 1), c("#f0f0f0", "royalblue2"))
 Heatmap(mat, name = "adj", col = mycolourramp,
   row_order = get_order(ser, 1), column_order = get_order(ser, 2),
   row_title = "cells", column_title = "genes", use_raster = TRUE,
