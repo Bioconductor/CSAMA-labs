@@ -460,7 +460,7 @@ Heatmap(adj[csub, ], name = "adj", col = colorRamp2(c(-1, 0, 1), c("RoyalBlue", 
   show_row_names = FALSE, show_column_names = FALSE, show_row_dend = FALSE, show_column_dend = FALSE)
 ```
 
-Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret these as biological processes or regulatory programmes.
+Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret these as biological processes or regulatory programmes. Similarly, we can look for sets of cells that show differential co-expression. We can use this refine our notions of cell type defined from static expression maps, discover new subpopulations or commonalities.
 
 ::: {.callout-warning collapse="false"}
 ## Biclustering
