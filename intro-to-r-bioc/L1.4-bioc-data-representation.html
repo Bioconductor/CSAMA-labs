@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.4">
+<meta name="generator" content="quarto-1.8.25">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -68,10 +68,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="L1.4-bioc-data-representation_files/libs/quarto-html/tippy.umd.min.js"></script>
 <script src="L1.4-bioc-data-representation_files/libs/quarto-html/anchor.min.js"></script>
 <link href="L1.4-bioc-data-representation_files/libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="L1.4-bioc-data-representation_files/libs/quarto-html/quarto-syntax-highlighting-485605091aded536db53fb751867c3cd.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="L1.4-bioc-data-representation_files/libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="L1.4-bioc-data-representation_files/libs/bootstrap/bootstrap.min.js"></script>
 <link href="L1.4-bioc-data-representation_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="L1.4-bioc-data-representation_files/libs/bootstrap/bootstrap-21bde2f931a99665fbf83a991a54851e.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="L1.4-bioc-data-representation_files/libs/bootstrap/bootstrap-0f84be458ac1676c4ed837d23416e910.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script src="L1.4-bioc-data-representation_files/libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="L1.4-bioc-data-representation_files/libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="L1.4-bioc-data-representation_files/libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -175,7 +175,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Author</div>
     <div class="quarto-title-meta-contents">
-             <p>Martin Morgan, Sonali Arora, Lori Shepherd, <a href="mailto:davide.risso@unipd.it">Davide Risso</a>, <a href="mailto:ilaria.billato@phd.unipd.it">Ilaria Billato</a> </p>
+             <p>Martin Morgan, Sonali Arora, Lori Shepherd, <a href="mailto:davide.risso@unipd.it">Davide Risso</a>, <a href="mailto:ilaria.billato@unipd.it">Ilaria Billato</a> </p>
           </div>
   </div>
     
@@ -422,7 +422,6 @@ Class:       DataFrame       character            list
 
 Extends: 
 Class "GenomicRanges", directly
-Class "GRanges_OR_NULL", directly
 Class "Ranges", by class "GenomicRanges", distance 2
 Class "GenomicRanges_OR_missing", by class "GenomicRanges", distance 2
 Class "GenomicRanges_OR_GenomicRangesList", by class "GenomicRanges", distance 2
@@ -667,8 +666,8 @@ DE?DD&gt;ED4&gt;EEE&gt;DE8EEEDE8B?EB&lt;@3;BA79?,881B?@73;1?####################
 <span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>chr14_dna <span class="ot">&lt;-</span> <span class="fu">getSeq</span>(Hsapiens, chr14_range)</span>
 <span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a><span class="fu">letterFrequency</span>(chr14_dna, <span class="st">"GC"</span>, <span class="at">as.prob=</span><span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>          G|C
-[1,] 0.336276</code></pre>
+<pre><code>           G|C
+[1,] 0.3454924</code></pre>
 </div>
 </div>
 <p><strong>Exercises</strong></p>
@@ -1334,18 +1333,23 @@ colData names(0):</code></pre>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb118"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb118-1"><a href="#cb118-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>R version 4.6.0 (2026-04-24)
-Platform: aarch64-apple-darwin23
-Running under: macOS Tahoe 26.4.1
+Platform: x86_64-pc-linux-gnu
+Running under: Ubuntu 24.04.4 LTS
 
 Matrix products: default
-BLAS:   /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRblas.0.dylib 
-LAPACK: /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
+BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.12.0 
+LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.12.0  LAPACK version 3.12.0
 
 locale:
-[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+ [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+ [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
 
-time zone: Europe/Berlin
-tzcode source: internal
+time zone: Europe/Rome
+tzcode source: system (glibc)
 
 attached base packages:
 [1] stats4    stats     graphics  grDevices utils     datasets  methods  
@@ -1371,60 +1375,58 @@ other attached packages:
 [17] rtracklayer_1.72.0                      
 [18] BiocIO_1.22.0                           
 [19] GenomeInfoDb_1.48.0                     
-[20] pwalign_1.8.0                           
-[21] GenomicRanges_1.64.0                    
-[22] Biostrings_2.80.0                       
-[23] Seqinfo_1.2.0                           
-[24] XVector_0.52.0                          
-[25] IRanges_2.46.0                          
-[26] S4Vectors_0.50.0                        
-[27] BiocGenerics_0.58.0                     
-[28] generics_0.1.4                          
-[29] BiocStyle_2.40.0                        
+[20] GenomicRanges_1.64.0                    
+[21] Biostrings_2.80.0                       
+[22] Seqinfo_1.2.0                           
+[23] XVector_0.52.0                          
+[24] IRanges_2.46.0                          
+[25] S4Vectors_0.50.1                        
+[26] BiocGenerics_0.58.1                     
+[27] generics_0.1.4                          
 
 loaded via a namespace (and not attached):
  [1] DBI_1.3.0                   bitops_1.0-9               
  [3] httr2_1.2.2                 rlang_1.2.0                
- [5] magrittr_2.0.5              gypsum_1.8.0               
- [7] compiler_4.6.0              RSQLite_2.4.6              
- [9] png_0.1-9                   vctrs_0.7.3                
-[11] ProtGenerics_1.44.0         pkgconfig_2.0.3            
-[13] crayon_1.5.3                fastmap_1.2.0              
-[15] dbplyr_2.5.2                rmarkdown_2.31             
-[17] UCSC.utils_1.8.0            scRNAseq_2.26.0            
-[19] purrr_1.2.2                 bit_4.6.0                  
-[21] xfun_0.57                   cachem_1.1.0               
-[23] cigarillo_1.2.0             jsonlite_2.0.0             
-[25] blob_1.3.0                  rhdf5filters_1.24.0        
-[27] DelayedArray_0.38.1         Rhdf5lib_2.0.0             
-[29] parallel_4.6.0              R6_2.6.1                   
-[31] Rcpp_1.1.1-1.1              knitr_1.51                 
-[33] Matrix_1.7-5                tidyselect_1.2.1           
-[35] rstudioapi_0.18.0           abind_1.4-8                
-[37] yaml_2.3.12                 codetools_0.2-20           
-[39] curl_7.1.0                  lattice_0.22-9             
-[41] alabaster.sce_1.12.0        tibble_3.3.1               
-[43] withr_3.0.2                 KEGGREST_1.52.0            
-[45] evaluate_1.0.5              BiocFileCache_3.2.0        
-[47] alabaster.schemas_1.12.0    ExperimentHub_3.2.0        
-[49] pillar_1.11.1               BiocManager_1.30.27        
-[51] filelock_1.0.3              RCurl_1.98-1.18            
-[53] BiocVersion_3.23.1          ensembldb_2.36.0           
-[55] alabaster.base_1.13.0       alabaster.ranges_1.12.0    
-[57] glue_1.8.1                  alabaster.matrix_1.12.0    
-[59] lazyeval_0.2.3              tools_4.6.0                
-[61] AnnotationHub_4.2.0         XML_3.99-0.23              
-[63] rhdf5_2.56.0                grid_4.6.0                 
-[65] SingleCellExperiment_1.34.0 HDF5Array_1.40.0           
-[67] restfulr_0.0.16             cli_3.6.6                  
-[69] rappdirs_0.3.4              S4Arrays_1.12.0            
-[71] dplyr_1.2.1                 AnnotationFilter_1.36.0    
-[73] alabaster.se_1.12.0         digest_0.6.39              
-[75] SparseArray_1.12.2          rjson_0.2.23               
-[77] htmlwidgets_1.6.4           memoise_2.0.1              
-[79] htmltools_0.5.9             lifecycle_1.0.5            
-[81] h5mread_1.4.0               httr_1.4.8                 
-[83] bit64_4.8.0                </code></pre>
+ [5] magrittr_2.0.5              otel_0.2.0                 
+ [7] gypsum_1.8.0                compiler_4.6.0             
+ [9] RSQLite_3.52.0              png_0.1-9                  
+[11] vctrs_0.7.3                 ProtGenerics_1.44.0        
+[13] pkgconfig_2.0.3             crayon_1.5.3               
+[15] fastmap_1.2.0               dbplyr_2.5.2               
+[17] rmarkdown_2.31              UCSC.utils_1.8.0           
+[19] scRNAseq_2.26.0             purrr_1.2.2                
+[21] bit_4.6.0                   xfun_0.57                  
+[23] cachem_1.1.0                cigarillo_1.2.0            
+[25] jsonlite_2.0.0              blob_1.3.0                 
+[27] rhdf5filters_1.24.0         DelayedArray_0.38.1        
+[29] Rhdf5lib_2.0.0              parallel_4.6.0             
+[31] R6_2.6.1                    Rcpp_1.1.1-1.1             
+[33] knitr_1.51                  Matrix_1.7-5               
+[35] tidyselect_1.2.1            rstudioapi_0.18.0          
+[37] abind_1.4-8                 yaml_2.3.12                
+[39] codetools_0.2-20            curl_7.1.0                 
+[41] lattice_0.22-9              alabaster.sce_1.12.0       
+[43] tibble_3.3.1                withr_3.0.2                
+[45] KEGGREST_1.52.0             evaluate_1.0.5             
+[47] BiocFileCache_3.2.0         alabaster.schemas_1.12.0   
+[49] ExperimentHub_3.2.0         pillar_1.11.1              
+[51] BiocManager_1.30.27         filelock_1.0.3             
+[53] RCurl_1.98-1.18             BiocVersion_3.23.1         
+[55] ensembldb_2.36.0            alabaster.base_1.12.0      
+[57] glue_1.8.1                  alabaster.ranges_1.12.0    
+[59] alabaster.matrix_1.12.0     lazyeval_0.2.3             
+[61] tools_4.6.0                 AnnotationHub_4.2.0        
+[63] XML_3.99-0.23               rhdf5_2.56.0               
+[65] grid_4.6.0                  SingleCellExperiment_1.34.0
+[67] HDF5Array_1.40.0            restfulr_0.0.16            
+[69] cli_3.6.6                   rappdirs_0.3.4             
+[71] S4Arrays_1.12.0             dplyr_1.2.1                
+[73] AnnotationFilter_1.36.0     alabaster.se_1.12.0        
+[75] digest_0.6.39               SparseArray_1.12.2         
+[77] rjson_0.2.23                htmlwidgets_1.6.4          
+[79] memoise_2.0.1               htmltools_0.5.9            
+[81] lifecycle_1.0.5             h5mread_1.4.0              
+[83] httr_1.4.8                  bit64_4.8.0                </code></pre>
 </div>
 </div>
 </section>
