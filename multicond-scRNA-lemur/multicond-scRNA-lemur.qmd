@@ -173,9 +173,9 @@ LEMUR is a tool to analyze multi-condition single-cell data. A typical analysis 
 2. Prediction of the differential expression for each cell per gene.
 3. Identification of groups (or: "neighbourhoods") of cells with similar differential expression patterns.
 4. Pseudobulk differential expression testing per neighbourhood.
-5. Bi-clustering of cells and genes with similar differential expression patterns
+5. Biclustering of cells and genes with similar differential expression patterns
 
-A basic workflow with might look like this^[Future versions might simplify this into a single end-to-end function.]:
+A basic workflow might look like this^[Future versions might simplify this into a single end-to-end function.]:
 ```{r}
 #| label: lemur-workflow
 #| eval: true
@@ -202,7 +202,6 @@ The `lemur` function takes as input a `SingleCellExperiment` object, the specifi
 ```{r}
 #| label: fit-lemur-model
 #| message: false
-library("lemur")
 fit <- lemur(sce, design = ~ stim, n_embedding = 30, verbose = FALSE)
 fit <- align_by_grouping(fit, fit$colData$cell, verbose = FALSE)
 ```
@@ -484,14 +483,20 @@ Many variations of what happens in the next code chunk are possible:
 ```{r}
 #| label: svdnmf
 #| message: false
-j <- 1
+j <-  1
 adjsvd <- irlba::irlba(abs(adj))
 adj_js <- with(adjsvd, u[, j, drop = FALSE] %*% t(v[, j, drop = FALSE]) * d[j])
 
-adjnmf <- RcppML::nmf(abs(adj), k = 12, verbose = FALSE)
+adjnmf <- RcppML::nmf(abs(adj), k = 10, verbose = FALSE, tol = 9.54e-07, maxit = 256)
 adj_jn <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])  # the matrix approximation from the j-th NMF component
 ```
-
+```{r}
+#| label: checknmf
+#| echo: false
+if (!all(diff(log(adjnmf$d)) > (-2))) {   # want no extreme jumps in 'eigenvalues'
+  stop(paste("RcppML::nmf returned singular values of d:", paste(signif(adjnmf$d, 4), collapse = ", ")))
+} 
+```
 ::: {.callout-note collapse="true"}
 ## Plot `adj_jn`, i.e., the matrix spanned by the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
 ```{r}
@@ -650,10 +655,11 @@ adjappr4ser <- adjappr4ser[csub, ]
 #| message: false
 library("seriation")
 ser <- seriate(adjappr4ser, method = "BEA_TSP")
-myhm <- function(x, name = deparse(substitute(x)), col = colorRamp2(range(x), c("#ffffff", "RoyalBlue")))
+myhm <- function(x, name = deparse(substitute(x)), col = colorRamp2(range(x), c("#ffffff", "RoyalBlue"))) {
   Heatmap(x, name = name, col = col, row_title = "cells", column_title = "genes", 
-    row_order = get_order(ser, 1), column_order = get_order(ser, 2),
-    show_row_names = FALSE, show_column_names = FALSE, use_raster = TRUE)
+      row_order = get_order(ser, 1), column_order = get_order(ser, 2),
+      show_row_names = FALSE, show_column_names = FALSE, use_raster = TRUE)
+}
 myhm(adjs)
 myhm(adjapprs)
 ```
@@ -674,7 +680,6 @@ for (j in seq_len(ncol(wd)))
              name = sprintf("j=%d", j),
              col = colorRamp2(c(0, 1), c("#d0d0d0", "RoyalBlue"))))
 ```
-
 :::
 
 ```{r}
