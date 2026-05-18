@@ -450,12 +450,12 @@ want it, but nothing complicated. Note the random subsetting of rows by `csub`. 
 #| fig-width: 5
 #| fig-height: 7
 #| out-width: "75%"
-#| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Blue: inside the neighbourhood, LFC<0; red: inside the neighbourhood, LFC>0; light grey: outside (no edge)."
+#| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Yellow: inside the neighbourhood, LFC<0; blue: inside the neighbourhood, LFC>0; light grey: outside (no edge)."
 library("ComplexHeatmap")
 library("circlize")
 require("magick")
 csub <- sample(nrow(adj), 2048) 
-Heatmap(adj[csub, ], name = "adj", col = colorRamp2(c(-1, 0, 1), c("RoyalBlue", "#f0f0f0", "firebrick1")),
+Heatmap(adj[csub, ], name = "adj", col = colorRamp2(c(-1, 0, 1), c("#FFD700", "#f0f0f0", "#0057B7")),
   row_title = "cells", column_title = "genes", use_raster = TRUE,
   show_row_names = FALSE, show_column_names = FALSE, show_row_dend = FALSE, show_column_dend = FALSE)
 ```
@@ -585,6 +585,8 @@ We can now revisit @fig-lemur-umap-celltypes and compare it with our bicluster.
 ```{r}
 #| label: fig-bicluster-and-celltypes
 #| layout-ncol: 2
+#| fig-width: 5
+#| fig-height: 5
 #| fig-cap: 
 #|   - Same as @fig-lemur-umap-celltypes
 #|   - The `j`-th bicluster
@@ -605,13 +607,14 @@ gglem + geom_point(aes(colour = bic), size = 0.3) + scale_colour_discrete(palett
 #| fig-width: 5
 #| fig-height: 5.5
 #| fig-cap: "Cell type annotations versus membership in bicluster `j`. How would you biologically interpret this bicluster?"
-plot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), main = "", las = 2)
+mosaicplot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), 
+           main = "", las = 2, color =  c("#0057B7", "#FFD700"))
 ```
 
 TO DO:
 
 - Do gene set enrichment / hallmarks on the genes
-- Move the below challenge "Quantifying the coverage of the biclusters" into the Appendix —  hopefully it can serve towards future development of LEMUR2
+- Move the below challenge "Looking at the coverage of the biclusters" into the Appendix —  hopefully it can serve towards future development of LEMUR2
 
 ::: {.callout-note collapse="true"}
 ## Challenge: Other biclusters
