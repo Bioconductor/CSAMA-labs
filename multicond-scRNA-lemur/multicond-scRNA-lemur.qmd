@@ -498,6 +498,7 @@ adj_jn <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])  # t
 #| echo: false
 if (!all(diff(log(adjnmf$d)) > (-2)))   # want no extreme jumps in 'eigenvalues'
   stop(paste("RcppML::nmf returned singular values of d:", paste(signif(adjnmf$d, 4), collapse = ", ")))
+# possible alternative approach: call RcppML::nmf with large k, and then inspect the d values to see how many components there really are. 
 ```
 ::: {.callout-note collapse="true"}
 ## Plot `adj_jn`, i.e., the matrix spanned by the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
