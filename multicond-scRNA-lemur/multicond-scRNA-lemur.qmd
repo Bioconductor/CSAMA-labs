@@ -609,7 +609,6 @@ plot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), mai
 
 TO DO:
 
-- The identified bicluster is a bit "boring", as it involves almost all genes, and a whole island in the UMAP — can we switch to discussing a less obvious one?
 - Do gene set enrichment / hallmarks on the genes
 - Move the below challenge  Quantifying the coverage of the "biclusters" into the Appendix — and hopefully can serve towards future development of LEMUR2
 
