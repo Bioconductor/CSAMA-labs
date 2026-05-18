@@ -21,11 +21,11 @@ knitr::opts_chunk$set(
 
 **Original Authors:** Martin Morgan, Sonali Arora, Lori Shepherd<br />
 **Presenting Author:** [Davide Risso][], [Ilaria Billato][]</br >
-**Date:** 6-11 July, 2025</br >
+**Date:** 24-29 May, 2026</br >
 **Back:** [Monday labs](lab-1-intro-to-r-bioc.html)
 
 [Davide Risso]: mailto: davide.risso@unipd.it
-[Ilaria Billato]: mailto: ilaria.billato@phd.unipd.it
+[Ilaria Billato]: mailto: ilaria.billato@unipd.it
 
 
 **Objective**: Gain confidence working with 'tidy' R commands and data
