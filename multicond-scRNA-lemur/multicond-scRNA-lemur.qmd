@@ -167,32 +167,27 @@ ggum + geom_point(aes(colour = paste(stim, cell, sep = ": ")), size = 0.3) +
 
 ![LEMUR workflow](images/lemur_workflow.png){#fig-lemur-workflow width="100%"}
 
-LEMUR is a tool to analyze multi-condition single-cell data. A typical analysis workflow with LEMUR goes through four steps (@fig-lemur-workflow):
+LEMUR is a tool to analyze multi-condition single-cell data. A typical analysis workflow with LEMUR goes through five steps (@fig-lemur-workflow):
 
 1. Covariate-adjusted dimensionality reduction.
 2. Prediction of the differential expression for each cell per gene.
-3. Identification of neighbourhoods of cells with similar differential expression patterns.
-4. Pseudobulked differential expression testing per neighbourhood.
+3. Identification of groups (or: "neighbourhoods") of cells with similar differential expression patterns.
+4. Pseudobulk differential expression testing per neighbourhood.
+5. Bi-clustering of cells and genes with similar differential expression patterns
 
-These are implemented by the following code.
-
+A basic workflow with might look like this^[Future versions might simplify this into a single end-to-end function.]:
 ```{r}
 #| label: lemur-workflow
-#| eval: false
+#| eval: true
 #| message: false
 library("lemur")
-# Step 1
-fit <- lemur(sce, design = ~ stim, n_embedding = 30)
-fit <- align_by_grouping(fit, fit$colData$cell)
-
-# Step 2
-fit <- test_de(fit, contrast = cond(stim = "stim") - cond(stim = "ctrl"))
-
-# Steps 3 and 4
+fit <- lemur(sce, design = ~ stim, n_embedding = 30)  
+fit <- align_by_grouping(fit, fit$colData$cell) |>
+          test_de(contrast = cond(stim = "stim") - cond(stim = "ctrl"))
 nei <- find_de_neighborhoods(fit, group_by = vars(ind, stim))
 ```
 
-In the next sections we discuss these steps in more detail.
+In the following, we go through each step in a little more detail.
 
 ## LEMUR Integration (Step 1)
 
@@ -447,6 +442,8 @@ adj = adj[colnames(sce), ]
 ggplot(tibble(rs = rowSums(adj)), aes(x = rs)) + geom_histogram(bins = 100)
 ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 ```
+Let's look at a heatmap rendering of `adj`. We use the `Heatmap` function from the `ComplexHeatmap` package. Calling it needs a litany of parameters to customise the plot as we
+want it, but nothing complicated. Note the random subsetting of rows by `csub`. This is because the `r nrow(adj)` rows of `adj` are too many to see on the screen anyway (your screen will likely only have a few thousand pixels in vertical direction), and the subsetting saves computation time.
 ```{r}
 #| label: fig-adj-heatmap
 #| message: false
@@ -456,7 +453,8 @@ ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
 #| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Blue: inside the neighbourhood, LFC<0; red: inside the neighbourhood, LFC>0; light grey: outside (no edge)."
 library("ComplexHeatmap")
 library("circlize")
-csub <- sample(nrow(adj), 2048) # random subset to save compute time and since we cannot see more anyway (pixel resolution)
+require("magick")
+csub <- sample(nrow(adj), 2048) 
 Heatmap(adj[csub, ], name = "adj", col = colorRamp2(c(-1, 0, 1), c("RoyalBlue", "#f0f0f0", "firebrick1")),
   row_title = "cells", column_title = "genes", use_raster = TRUE,
   show_row_names = FALSE, show_column_names = FALSE, show_row_dend = FALSE, show_column_dend = FALSE)
@@ -469,17 +467,13 @@ Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure
 [Biclustering or coclustering](https://en.wikipedia.org/wiki/Biclustering) is a data analysis technique that simultaneously groups rows and columns of a matrix to identify subsets of rows that exhibit coherent patterns within subsets of columns. 
 :::
 
-A dedicated package for biclustering of `lemur` predictions is currently under development by the authors of this lab, and we aim to release it soon. The approach is based on a sparse matrix decomposition of the adjacency matrix (as in @fig-adj-heatmap) followed by an algorithm to assign cells and genes to biclusters, designed such that a cell or a gene can be part of _multiple_  biclusters. This is motivated by the biological observation that a gene can contribute to multiple biological processes, and cells can respond to condition changes through up- or downregulation of multiple programmes. 
+A dedicated package for biclustering of `lemur` predictions is currently under development by the authors of this lab, and we aim to release it soon. The approach is based on low-rank (and possibly sparse) matrix decomposition of the adjacency matrix (as in @fig-adj-heatmap) followed by an algorithm to assign cells and genes to biclusters, designed such that a cell or a gene can be part of _multiple_  biclusters. This is motivated by the biological observation that a gene can contribute to multiple biological processes, and cells can respond to condition changes through up- or downregulation of multiple programmes. 
 
 ::: {.callout-note collapse="false"}
 ## Questions to Tim 
 - Let's find a better name than _master neighbourhood_ (sounds like something from colonial times Africa or America; see also <https://claude.ai/share/e03f45ee-cf4c-4653-bc2e-3db1a9e6b0a5>). I then [asked the chatbot for suggestions](https://claude.ai/share/b582b251-d02f-4e64-a4a4-4f7a9f65afbe). Shall we just go for "bicluster of cells" and "bicluster of genes"? I think the name "neighbourhood" confuses many people, anyway, it is too abstract, it's one of the mistakes of the existing paper.
-- Above, you say "sparse matrix decomposition of the adjacency matrix", but the matrix does not seem to be very sparse, once you select genes with a "significant" neighbourhood. Should we not rather talk about _approximation with a low rank matrix_; or perhaps _low rank approximation with SVD or NMF using sparse components_?
-- The repeated intersection approach seems overly stringent / conservative, i.e., it will loose many cells just because they didn't reach a thresholds for one particular gene. I'm hoping for something more like smoothing, literally, finding almost but not perfectly coloured rectangles in @fig-adj-heatmap. More generally, I think your greedy recruitment below is (with all respect) just another clustering algorithm. There are already millions of clustering algorithms, I think one needs a pretty strong argument for inventing a new one. For now, I'd prefer getting the (sparse?) SVD or NMF approach to work.
-- What about signs? your Jaccard approach seems to not use them. Not sure the Euclidean distance used by `Heatmap` (in @fig-adj-heatmap) is fundamentally better, but it does take sign into account.
+- What about using signs? The Jaccard approach below seems to not use them. In the current NMF I also take `abs(adj)`. But one could of course explore whether taking sign into account is not better.
 - The current approach of finding "neighbourhoods" for each gene with the random projections, and then biclustering... -- Can the biclustering idea already be integrated earlier on?
-- Migrate all heatmaps to `ComplexHeatmap::Heatmap` and [seriation by TSP](https://nicolas.kruchten.com/content/2018/02/seriation/), as in @fig-morenmf?
-
 :::
 
 Many variations of what happens in the next code chunk are possible: 
@@ -490,7 +484,6 @@ Many variations of what happens in the next code chunk are possible:
 ```{r}
 #| label: svdnmf
 #| message: false
-set.seed(0xdada)
 j <- 1
 adjsvd <- irlba::irlba(abs(adj))
 adj_js <- with(adjsvd, u[, j, drop = FALSE] %*% t(v[, j, drop = FALSE]) * d[j])
@@ -514,7 +507,7 @@ Heatmap(adj_jn[csub, ][order(adjnmf$w[csub, j]), order(adjnmf$h[j, ])],
 )
 ```
 Note that here we use a [sequential colour map rather than a diverging](https://www.huber.embl.de/msmb/03-chap.html#sec-graphics-color) one, since the values are all positive.
-To order the rows and columns in this plot, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering. We also need to do some extra index gymnastics to keep track of the random subsampling of `r length(csub)` rows for plotting.
+To order the rows and columns in this plot, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering^[See, e.g., <https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html> Section 2.3.4.]. We also need to do some extra index gymnastics to keep track of the random subsampling of `r length(csub)` rows for plotting.
 
 Bonus: produce similar plots for other values of `j`.
 :::
@@ -556,7 +549,9 @@ table(bic_cells)
 ```
 :::
 
-Now we are able to visualize this bicluster on top of a heatmap like in @fig-adj-heatmap. Note that while @fig-adj-heatmap distinguishes between -1 and +1 for indicating neighbourhoods in which the gene is down- or up-regulated, we have here chosen to do the NMF on the absolute values. Most of the code below is for ordering the rows and columns of the matrix first, by whether they are inside or outside the bicluster, and second, by dendrogram order from a hierarchical clustering (which is the default in `pheatmap`, and thus happened for @fig-adj-heatmap). There is also some additional index gymnastics with `csub` to randomly subset rows for visualization, to save computation time. The blue-yellow bars at the sides of the matrix indicate membership in our bicluster (`j=``r j`).
+Now we are able to visualize this bicluster on top of a heatmap like in @fig-adj-heatmap. Note that while @fig-adj-heatmap distinguishes between -1 and +1 for indicating neighbourhoods in which the gene is down- or up-regulated, we have here chosen to do the NMF on the absolute values. 
+
+Most of the code below is for ordering the rows and columns of the matrix using _seriation_, i.e., a one-dimensional embedding of multivariate objects. For this, we use a travelling salesperson algorithm as implemented in the [seriation package](https://github.com/mhahsler/seriation). The seriation is dominated by bicluster membership (the `LARGE` term in the code below), and then, by the finer structure within `mat` (the absolute value of the submsampled adjacency matrix) itself. The at the top and right sides of the matrix indicate membership in our bicluster (`j=``r j`).
 
 ```{r}
 #| label: fig-component1-heatmap
@@ -564,19 +559,18 @@ Now we are able to visualize this bicluster on top of a heatmap like in @fig-adj
 #| fig-height: 7
 #| out-width: "75%"
 #| fig-cap: ""
-csub <- sample(nrow(adj), 2048)
+library("seriation")
 LARGE <- 10
-mat_for_plotting <- abs(adj)[csub, ] 
-mat_for_ordering <- mat_for_plotting + LARGE * (bic_cells[csub, , drop = FALSE] %*% bic_genes)
-row_order <- order.dendrogram(as.dendrogram(hclust(dist(  mat_for_ordering ))))
-col_order <- order.dendrogram(as.dendrogram(hclust(dist(t(mat_for_ordering)))))
-mycolours <- c(`FALSE`= "#FFD700", `TRUE` = "#0057B7")
-pheatmap(mat_for_plotting[row_order, col_order],
-   show_rownames = FALSE, show_colnames = FALSE, cluster_rows = FALSE, cluster_cols = FALSE,
-   annotation_row = data.frame(inside = bic_cells[csub] + 0,      row.names = rownames(mat_for_plotting)),
-   annotation_col = data.frame(inside = as.vector(bic_genes) + 0, row.names = colnames(mat_for_plotting)),
-   color = mycolours,
-   annotation_color = list(inside = mycolours)
+mat <- abs(adj)[csub, ] 
+ser <- seriate(mat + LARGE * (bic_cells[csub, , drop = FALSE] %*% bic_genes), method = "BEA_TSP")
+mycolours <- c(`FALSE` = "#f0f0f0", `TRUE` = "royalBlue4")
+mycolourramp <- colorRamp2(c(0, 1), c("#ffffff", "royalblue2"))
+Heatmap(mat, name = "adj", col = mycolourramp,
+  row_order = get_order(ser, 1), column_order = get_order(ser, 2),
+  row_title = "cells", column_title = "genes", use_raster = TRUE,
+  show_row_names = FALSE, show_column_names = FALSE, cluster_rows = FALSE, cluster_columns = FALSE, show_heatmap_legend = FALSE,
+  right_annotation = HeatmapAnnotation(inside = as.factor(bic_cells[csub]), which = "row", col = list(inside = mycolours), show_legend = FALSE),
+  top_annotation   = HeatmapAnnotation(inside = as.factor(bic_genes),    which = "column", col = list(inside = mycolours), show_legend = FALSE)
 )
 ```
 
@@ -619,14 +613,12 @@ Redo the above enrichment analysis for cell types and gene pathways for another 
 
 ::: {.callout-note collapse="true"}
 ## Challenge: Quantifying the coverage of the "biclusters"
-Redo the NMF from above using `k=12` and create a plot like @fig-adj-jn for the linear combination, i.e., visualize the low-rank approximation and compare it to @fig-adj-heatmap.
+Create a plot like @fig-adj-jn for the linear combination of all `r length(adjnmf$d)` factors, i.e.,
+visualize the low-rank (`k=```r length(adjnmf$d)`) approximation and compare it to @fig-adj-heatmap.
 
 ```{r}
 #| label: morenmf
 #| message: false
-k = 12
-adjnmf <- RcppML::nmf(abs(adj), k = k, verbose = FALSE)
-
 dichotomise <- function(x) {
   # `cluster` is either 1 or 2, `centers` are the coordinates of the cluster centers, the `sign` function returns values 
   # of -1 or +1 depending on the relative position of the centers along the real axis. The expression below gives
@@ -677,7 +669,7 @@ table(adjappr)
 #| layout-ncol: 4
 #| outwidth: "100%"
 #| message: false
-for (j in seq_len(k))
+for (j in seq_len(ncol(wd)))
   print(myhm(wd[csub, j, drop = FALSE]  %*% hd[j, , drop = FALSE], 
              name = sprintf("j=%d", j),
              col = colorRamp2(c(0, 1), c("#d0d0d0", "RoyalBlue"))))
