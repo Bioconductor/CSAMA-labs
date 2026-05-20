@@ -41,7 +41,7 @@ However, such discrete categorization tends to be an unsatisfactory model of the
 Here, we use _latent embedding multivariate regression_ (LEMUR) (@AhlmannEltze:NatGen:2025), a model that operates without or before commitment to discrete cell type categorization. 
 LEMUR fits a regression model that _predicts_ for each cell the expression of its genes in each of the conditions.
 Note that for any given cell, the expression of its genes was only _observed_ in one replicate of one condition.
-The predictions enable us to compute any _contrast_^[the technical term for differential expression effects] of interest, such as: how would the expression of a certain gene in a particular cell differ between treatment and control condition? It even lets us inter- and extrapolate between conditions, or consider more complex experimental designs such as factorial analysis, blocking factors, or continuous covariates. Given such contrasts, we can do _biclustering_ to find groups of genes that behave similarly in a group of cells. Such a group of genes may then be interpreted in terms of pathways, such a groups of cells as a cell types, a combinations of several cell types, or subsets of a cell types.
+The predictions enable us to compute any _contrast_^[the technical term for differential expression effects] of interest, such as: how would the expression of a certain gene in a particular cell differ between treatment and control condition? It even lets us inter- and extrapolate between conditions, or consider more complex experimental designs such as factorial analysis, blocking factors, or continuous covariates. Given such contrasts, we can do _biclustering_ to find groups of genes that behave similarly across a group of cells. Such a group of genes may then be interpreted in terms of pathways or a coordinated gene programme. Groups of cells is not necessarily associated to a single cell type, but also combinations of several cell types, or subsets within cell types.
 
 ![Figure 1 from @AhlmannEltze:NatGen:2025.](images/lemur_figure.png)
 
@@ -700,7 +700,7 @@ jaccard_index <- function(a, b) {
   length(intersect(a, b)) / length(union(a, b))
 }
 
-jaccard_df <- nei |> filter(adj_pval < 0.05) |>
+jaccard_df <- nei |> filter(adj_pval < 0.15) |>
   mutate(
     jaccard = map_dbl(neighborhood, ~ jaccard_index(.x, ref_cells)),
     mean_expr_inside = map2_dbl(
@@ -713,13 +713,14 @@ jaccard_df <- nei |> filter(adj_pval < 0.05) |>
   arrange(desc(jaccard))
 
 head(jaccard_df, 10)
+
 ```
 
-As we can see, many neighbourhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.9$, we obtain:
+As we can see, many neighbourhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.8$, we obtain:
 
 ```{r}
 recruited <- jaccard_df |>
-  filter(jaccard > 0.9) |>
+  filter(jaccard > 0.8) |>
   arrange(desc(jaccard))
 
 recruited_genes <- recruited$name
@@ -737,6 +738,10 @@ master_result <- list(
   genes = recruited_genes,
   neighborhood = master_neighborhood
 )
+
+print(length(master_result$genes))
+print(length(master_result$neighborhood))
+
 ```
 
 ```{r}
@@ -760,7 +765,7 @@ p_master_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
 p_master_neighborhood
 ```
 
-We now have a list of `{r length(master_result$genes)}` genes showing significant differential expression within a neighbourhood of `{r length(master_result$neighborhood)}` cells. To visualise the result, we can colour all cells belonging to the master neighbourhood as shown in @fig-master-neighbourhood.
+We now have a list of `{r} length(master_result$genes)` genes showing significant differential expression within a neighbourhood of `{r} length(master_result$neighborhood)` cells. To visualise the result, we can colour all cells belonging to the master neighbourhood as shown in @fig-master-neighbourhood.
 
 ```{r, paged.print=FALSE}
 #| label: fig-umap-bicluster-selected-genes
