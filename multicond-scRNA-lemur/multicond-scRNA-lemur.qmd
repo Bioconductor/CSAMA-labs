@@ -700,6 +700,7 @@ Heatmap(adj_jn[csub, ][order(adjnmf$w[csub, j]), order(adjnmf$h[j, ])],
   show_row_names = FALSE, show_column_names = FALSE, cluster_rows = FALSE, cluster_columns = FALSE
 )
 ```
+
 Note that here we use a [sequential colour map rather than a diverging](https://www.huber.embl.de/msmb/03-chap.html#sec-graphics-color) one, since the values are all positive.
 To order the rows and columns in this plot, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering^[See, e.g., <https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html> Section 2.3.4.]. 
 
