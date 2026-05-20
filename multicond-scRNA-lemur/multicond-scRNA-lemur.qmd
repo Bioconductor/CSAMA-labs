@@ -418,6 +418,197 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to go a step further and know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. In this step, which was not yet described by @AhlmannEltze:NatGen:2025, we use biclustering to address this question.
 
+### Why clustering neighborhoods is not enough
+
+As we already determined neighborhoods (i.e. subsets of cells) with coherent expression of a single gene, it seems only natural to further process these to identify superseeding neighborhoods, where the subset of cells shows coherent expression (or suppression) of multiple genes.
+
+Indeed, taking the previously determined neighborhoods, we can easily quantify their similarity using a simple Jaccard index ($J(A,B) = \frac{|A \cap B|}{|A \cup B|}$).
+
+```{r}
+#| label: jaccard
+top_gene <- slice_min(nei, did_pval, n = 1, with_ties = FALSE)
+ref_cells <- top_gene$neighborhood[[1]]
+
+# Function to compute Jaccard similarity
+jaccard_index <- function(a, b) {
+  a <- unique(a)
+  b <- unique(b)
+  if (length(a) == 0 && length(b) == 0) return(NA_real_)
+  length(intersect(a, b)) / length(union(a, b))
+}
+
+jaccard_df <- nei |> filter(adj_pval < 0.15) |>
+  mutate(
+    jaccard = map_dbl(neighborhood, ~ jaccard_index(.x, ref_cells)),
+    mean_expr_inside = map2_dbl(
+      name,
+      neighborhood,
+      ~ mean(assay(fit, "DE")[.x, .y], na.rm = TRUE)
+    )
+  ) |>
+  select(name, jaccard, mean_expr_inside) |>
+  arrange(desc(jaccard))
+
+head(jaccard_df, 10)
+
+```
+
+As we can see, many neighbourhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.8$, we obtain:
+
+```{r}
+recruited <- jaccard_df |>
+  filter(jaccard > 0.8) |>
+  arrange(desc(jaccard))
+
+recruited_genes <- recruited$name
+
+recruited_neighborhoods <- nei |>
+  filter(name %in% recruited_genes) |>
+  arrange(match(name, recruited_genes)) |>
+  pull(neighborhood)
+
+joined_neighborhood <- recruited_neighborhoods |>
+  as.list() |>
+  purrr::reduce(intersect)
+
+joined_result <- list(
+  genes = recruited_genes,
+  neighborhood = joined_neighborhood
+)
+
+print(length(joined_result$genes))
+print(length(joined_result$neighborhood))
+
+```
+
+```{r}
+#| label: fig-joined-neighbourhood
+#| fig-cap: 
+#|   - Joined neighbourhood from repeated intersection of gene neighbourhoods of similar Jaccard index
+joined_inside_df <- tibble(
+  cell_name = colnames(fit),
+  inside = cell_name %in% joined_result$neighborhood
+)
+
+p_joined_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
+  mutate(umap = lemur_umap) |>
+  left_join(joined_inside_df, by = "cell_name") |>
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
+  geom_point(aes(colour = inside), size = 0.3) +
+  scale_colour_manual(values = c(`FALSE` = "grey80", `TRUE` = "red")) +
+  coord_fixed() +
+  labs(title = "Joined neighborhood", colour = "Inside")
+
+p_joined_neighborhood
+```
+
+We now have a list of `{r} length(joined_result$genes)` genes showing significant differential expression within a neighbourhood of `{r} length(joined_result$neighborhood)` cells.
+To visualise the result, we can colour all cells belonging to the joined neighbourhood as shown in @fig-joined-neighbourhood.
+
+::: {.callout-note collapse="true"}
+## Challenge: Confirming neighborhood expression patterns on a UMAP
+
+
+```{r, paged.print=FALSE}
+#| label: fig-umap-bicluster-selected-genes
+#| fig-cap: 
+#|   - Differential expression of selected genes associated to the joined neighbourhood we constructed earlier.
+
+genes4 <- joined_result$genes[1:4]
+
+gene_expr_df <- as.data.frame(t(assay(fit, "DE")[genes4, , drop = FALSE])) |>
+  rownames_to_column("cell_name") |>
+  pivot_longer(
+    cols = -cell_name,
+    names_to = "gene",
+    values_to = "de"
+  )
+
+p_four_genes <- as_tibble(colData(sce), rownames = "cell_name") |>
+  mutate(umap = lemur_umap) |>
+  left_join(gene_expr_df, by = "cell_name") |>
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
+  geom_point(aes(colour = de), size = 0.3) +
+  scale_colour_gradient2(
+    low = scales::muted("blue"),
+    high = scales::muted("red")
+  ) +
+  coord_fixed() +
+  facet_wrap(vars(gene), ncol = 2) +
+  labs(colour = "DE")
+
+p_four_genes
+```
+
+
+
+We can visually confirm that the identified joined neighbourhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified and plotting their differential expression on the UMAP in @fig-umap-bicluster-selected-genes.
+
+:::
+
+Note that gene expression need not be restricted to that joined neighbourhood we constructed. Indeed, the intersection approach only guarantees to identify a neighbourhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighbourhoods. This could partially be remedied by also including subsets of cells instead of almost perfect overlap. However, this ansatz is still plagued by choosing somewhat arbitrary selection thresholds, and cuts tend to be overly conservative and therefore limit statistical power.
+
+Ideally, we want to process the differential expression from LEMUR in an unsupervised fashion. Also, we want to identify non-exclusive and non-exhaustive biclusters, since cells can react to a changing condition by changing multiple programmes, and genes themselves are not exclusive to individual response programmes.
+
+In the next section, we illustrate the usefulness of matrix factorization techniques to extract biclusters that are non-exhaustive and non-exclusive by design.
+
+::: {.callout-note collapse="true"}
+## Challenge: Quantifying the coherence of "biclusters"
+The goal of identifying biclusters and neighbourhoods of co-expression is not only to find genes that are, for example, significantly up- or downregulated within a neighbourhood, but rather to identify genes that show a coherent expression pattern. For example, if there is a gradient of differential expression within that neighbourhood, it would be interesting to see if other genes from the bicluster follow the same trend. In that sense, coherence is a stronger condition than simply averaged regulation over a given neighbourhood.
+
+If all genes are indeed showing perfectly coherent expression, the bicluster submatrix has exactly one axis of variation. In other words, for each cell and gene combination the signal decomposes into a gene and a cell intrinsic part $X_{gc} = G_g C_c$. Equivalently, the submatrix simply has $\mathrm{rank}(X) = 1$.
+
+This can be quantified using SVD. Let $\sigma_k$ denote the (sorted) singular values of the bicluster submatrix $X_\mathrm{sub}$. Then, $\alpha = \sigma^2/{\lVert X \rVert}_F^2$ quantifies how close the submatrix is to being rank one.
+
+```{r, paged.print=FALSE}
+#| label: submatrix-coherence-spectrum
+#| fig-cap: 
+#|   - Spectrum of singular values of the "bicluster" we constructed.
+
+X_sub <- assay(fit, "DE")[joined_result$genes,
+                          joined_result$neighborhood,
+                          drop = FALSE]
+
+sv <- svd(X_sub)
+
+sv_df <- tibble(
+  component = seq_along(sv$d[1:4]),
+  proportion = sv$d[1:4]^2 / sum(sv$d[1:4]^2)
+)
+
+p_spectrum <- ggplot(
+    sv_df |> slice_head(n = 10),
+    aes(component, proportion)
+  ) +
+  geom_point(
+    size = 2.5,
+    colour = "#2166AC"
+  ) +
+  scale_x_continuous(breaks = 1:10) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  labs(
+    title = "Singular value spectrum of bicluster",
+    x = "Singular component",
+    y = expression(sigma[k]^2 / sum(sigma[k]^2))
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+print(p_spectrum)
+```
+:::
+
+
+
+### Biclustering from matrix factorization
+
+Biclusters could be inferred directly from the differential expression matrix we found in Step 2. However, it can be convenient to  preprocess that matrix in a way that highlights the bicluster structure. Here we use the neighborhoods found in Step 4 to indiciate if a gene is significantly expressed (in the neighborhood) or not (outside).
+
 We start by observing that the neighbourhoods we discovered above can be visualised as a bipartite graph or as an adjacency matrix. A bipartite graph has two types of nodes, and edges only between nodes of different types. In our case, the nodes are genes and cells, and an edge exists between a cell and a gene if the cell is in the gene's neighbourhood. Let's visualise it.
 
 ```{r}
@@ -469,14 +660,9 @@ Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure
 
 A dedicated package for biclustering of `lemur` predictions is currently under development by the authors of this lab, and we aim to release it soon. The approach is based on low-rank (and possibly sparse) matrix decomposition of the adjacency matrix (as in @fig-adj-heatmap) followed by an algorithm to assign cells and genes to biclusters, designed such that a cell or a gene can be part of _multiple_  biclusters. This is motivated by the biological observation that a gene can contribute to multiple biological processes, and cells can respond to condition changes through up- or downregulation of multiple programmes. 
 
-::: {.callout-note collapse="true"}
-## Notes for future development
-- Let's find a better name than _master neighbourhood_ (sounds like something from colonial times Africa or America; see also <https://claude.ai/share/e03f45ee-cf4c-4653-bc2e-3db1a9e6b0a5>). I then [asked the chatbot for suggestions](https://claude.ai/share/b582b251-d02f-4e64-a4a4-4f7a9f65afbe). Shall we just go for "bicluster of cells" and "bicluster of genes"? I think the name "neighbourhood" confuses many people, anyway, it is too abstract, it's one of the mistakes of the existing paper.
-- What about using signs? The Jaccard approach below seems to not use them. In the current NMF I also take `abs(adj)`. But one could of course explore whether taking sign into account is not better.
-- The current approach of finding "neighbourhoods" for each gene with the random projections, and then biclustering... -- Can the biclustering idea already be integrated earlier on?
-- Many variations of what happens in the next code chunk are possible: 
-  1. Whether to do the matrix decompositions separately for the positive (up-regulated) and negative (down-regulated) neighbourhoods, or take the absolute value `abs(adj)`, as we do below. 
-  2. Choice between singular value decomposition (SVD; for which we below use the `irlba` method from the eponymous package; and where probably some additional sparsity-inducing regularisation is warranted) or non-negative matrix factorization (NMF). The positivity constraint seems relevant and necessary for adjacency matrices.
+::: {.callout-note collapse="false"}
+## Questions to Tim 
+- Migrate all heatmaps to `ComplexHeatmap::Heatmap` and [seriation by TSP](https://nicolas.kruchten.com/content/2018/02/seriation/), as in @fig-morenmf?
 :::
 
 ```{r}
@@ -687,171 +873,6 @@ for (j in seq_len(ncol(wd)))
 ```
 :::
 
-```{r}
-#| label: jaccard
-top_gene <- slice_min(nei, did_pval, n = 1, with_ties = FALSE)
-ref_cells <- top_gene$neighborhood[[1]]
-
-# Function to compute Jaccard similarity
-jaccard_index <- function(a, b) {
-  a <- unique(a)
-  b <- unique(b)
-  if (length(a) == 0 && length(b) == 0) return(NA_real_)
-  length(intersect(a, b)) / length(union(a, b))
-}
-
-jaccard_df <- nei |> filter(adj_pval < 0.15) |>
-  mutate(
-    jaccard = map_dbl(neighborhood, ~ jaccard_index(.x, ref_cells)),
-    mean_expr_inside = map2_dbl(
-      name,
-      neighborhood,
-      ~ mean(assay(fit, "DE")[.x, .y], na.rm = TRUE)
-    )
-  ) |>
-  select(name, jaccard, mean_expr_inside) |>
-  arrange(desc(jaccard))
-
-head(jaccard_df, 10)
-
-```
-
-As we can see, many neighbourhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.8$, we obtain:
-
-```{r}
-recruited <- jaccard_df |>
-  filter(jaccard > 0.8) |>
-  arrange(desc(jaccard))
-
-recruited_genes <- recruited$name
-
-recruited_neighborhoods <- nei |>
-  filter(name %in% recruited_genes) |>
-  arrange(match(name, recruited_genes)) |>
-  pull(neighborhood)
-
-master_neighborhood <- recruited_neighborhoods |>
-  as.list() |>
-  purrr::reduce(intersect)
-
-master_result <- list(
-  genes = recruited_genes,
-  neighborhood = master_neighborhood
-)
-
-print(length(master_result$genes))
-print(length(master_result$neighborhood))
-
-```
-
-```{r}
-#| label: fig-master-neighbourhood
-#| fig-cap: 
-#|   - Master neighbourhood from repeated intersection of gene neighbourhoods of similar Jaccard index
-master_inside_df <- tibble(
-  cell_name = colnames(fit),
-  inside = cell_name %in% master_result$neighborhood
-)
-
-p_master_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
-  mutate(umap = lemur_umap) |>
-  left_join(master_inside_df, by = "cell_name") |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-  geom_point(aes(colour = inside), size = 0.3) +
-  scale_colour_manual(values = c(`FALSE` = "grey80", `TRUE` = "red")) +
-  coord_fixed() +
-  labs(title = "Master neighborhood", colour = "Inside")
-
-p_master_neighborhood
-```
-
-We now have a list of `{r} length(master_result$genes)` genes showing significant differential expression within a neighbourhood of `{r} length(master_result$neighborhood)` cells. To visualise the result, we can colour all cells belonging to the master neighbourhood as shown in @fig-master-neighbourhood.
-
-```{r, paged.print=FALSE}
-#| label: fig-umap-bicluster-selected-genes
-#| fig-cap: 
-#|   - Differential expression of selected genes associated to the master neighbourhood we constructed earlier.
-
-genes4 <- master_result$genes[1:4]
-
-gene_expr_df <- as.data.frame(t(assay(fit, "DE")[genes4, , drop = FALSE])) |>
-  rownames_to_column("cell_name") |>
-  pivot_longer(
-    cols = -cell_name,
-    names_to = "gene",
-    values_to = "de"
-  )
-
-p_four_genes <- as_tibble(colData(sce), rownames = "cell_name") |>
-  mutate(umap = lemur_umap) |>
-  left_join(gene_expr_df, by = "cell_name") |>
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) +
-  geom_point(aes(colour = de), size = 0.3) +
-  scale_colour_gradient2(
-    low = scales::muted("blue"),
-    high = scales::muted("red")
-  ) +
-  coord_fixed() +
-  facet_wrap(vars(gene), ncol = 2) +
-  labs(colour = "DE")
-
-p_four_genes
-```
-
-We can visually confirm that the identified master neighbourhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified and plotting their differential expression on the UMAP in @fig-umap-bicluster-selected-genes.
-
-Note that gene expression need not be restricted to that neighbourhood. Indeed, the intersection approach only guarantees to identify a neighbourhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighbourhoods. This highlights once again the need to identify non-exclusive and non-exhaustive biclusters, since genes can participate in multiple programmes, and programmes themselves can differ across cell neighbourhoods.
-
-::: {.callout-note collapse="true"}
-## Challenge: Quantifying the coherence of biclusters
-The goal of identifying biclusters and neighbourhoods of co-expression is not only to find genes that are, for example, significantly up- or downregulated within a neighbourhood, but rather to identify genes that show a coherent expression pattern. For example, if there is a gradient of differential expression within that neighbourhood, it would be interesting to see if other genes from the bicluster follow the same trend. In that sense, coherence is a stronger condition than simply averaged regulation over a given neighbourhood.
-
-If all genes are indeed showing perfectly coherent expression, the bicluster submatrix has exactly one axis of variation. In other words, for each cell and gene combination the signal decomposes into a gene and a cell intrinsic part $X_{gc} = G_g C_c$. Equivalently, the submatrix simply has $\mathrm{rank}(X) = 1$.
-
-This can be quantified using SVD. Let $\sigma_k$ denote the (sorted) singular values of the bicluster submatrix $X_\mathrm{sub}$. Then, $\alpha = \sigma^2/{\lVert X \rVert}_F^2$ quantifies how close the submatrix is to being rank one.
-
-```{r, paged.print=FALSE}
-#| label: submatrix-coherence-spectrum
-#| fig-cap: 
-#|   - Spectrum of singular values of the bicluster we constructed.
-X_sub <- assay(fit, "DE")[master_result$genes,
-                          master_result$neighborhood,
-                          drop = FALSE]
-
-sv <- svd(X_sub)
-
-sv_df <- tibble(
-  component = seq_along(sv$d[1:4]),
-  proportion = sv$d[1:4]^2 / sum(sv$d[1:4]^2)
-)
-
-p_spectrum <- ggplot(
-    sv_df |> slice_head(n = 10),
-    aes(component, proportion)
-  ) +
-  geom_point(
-    size = 2.5,
-    colour = "#2166AC"
-  ) +
-  scale_x_continuous(breaks = 1:10) +
-  scale_y_continuous(
-    labels = scales::percent_format(accuracy = 1)
-  ) +
-  labs(
-    title = "Singular value spectrum of bicluster",
-    x = "Singular component",
-    y = expression(sigma[k]^2 / sum(sigma[k]^2))
-  ) +
-  theme_bw(base_size = 12) +
-  theme(
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(face = "bold")
-  )
-
-print(p_spectrum)
-```
-
-:::
 
 
 
