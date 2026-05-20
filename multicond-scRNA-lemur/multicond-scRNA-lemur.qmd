@@ -460,19 +460,19 @@ Heatmap(adj[csub, ], name = "adj", col = colorRamp2(c(-1, 0, 1), c("#FFD700", "#
   show_row_names = FALSE, show_column_names = FALSE, show_row_dend = FALSE, show_column_dend = FALSE)
 ```
 
-Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret these as biological processes or regulatory programmes. Similarly, we can look for sets of cells that show differential co-expression. We can use this refine our notions of cell type defined from static expression maps, discover new subpopulations or commonalities.
+Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret these as biological processes or regulatory programmes. Similarly, we can look for sets of cells that show differential co-expression. We can use these to refine our notions of cell type and state defined from static expression maps, to discover new subpopulations, or commonalities between known populations.
 
 ::: {.callout-warning collapse="false"}
 ## Biclustering
 [Biclustering or coclustering](https://en.wikipedia.org/wiki/Biclustering) is a data analysis technique that simultaneously groups rows and columns of a matrix to identify subsets of rows that exhibit coherent patterns within subsets of columns. 
 :::
 
-A dedicated package for biclustering of `lemur` predictions is currently under development by the authors of this lab, and we aim to release it soon. The approach is based on low-rank (and possibly sparse) matrix decomposition of the adjacency matrix (as in @fig-adj-heatmap) followed by an algorithm to assign cells and genes to biclusters, designed such that a cell or a gene can be part of _multiple_  biclusters. This is motivated by the biological observation that a gene can contribute to multiple biological processes, and cells can respond to condition changes through up- or downregulation of multiple programmes. 
+A dedicated package for biclustering of `lemur` predictions is currently under development by the authors of this lab, and we aim to release it soon. The approach is based on low-rank (and possibly sparse) matrix decomposition of the adjacency matrix (as in @fig-adj-heatmap) followed by an algorithm to assign cells and genes to biclusters, designed such that a cell or a gene can be part of _multiple_  biclusters. This is motivated by the biological observation that a gene can contribute to multiple biological processes, and cells can respond to condition changes through up- or downregulation of multiple processes. 
 
 ::: {.callout-note collapse="true"}
 ## Notes for future development
 - Let's find a better name than _master neighbourhood_ (sounds like something from colonial times Africa or America; see also <https://claude.ai/share/e03f45ee-cf4c-4653-bc2e-3db1a9e6b0a5>). I then [asked the chatbot for suggestions](https://claude.ai/share/b582b251-d02f-4e64-a4a4-4f7a9f65afbe). Shall we just go for "bicluster of cells" and "bicluster of genes"? I think the name "neighbourhood" confuses many people, anyway, it is too abstract, it's one of the mistakes of the existing paper.
-- What about using signs? The Jaccard approach below seems to not use them. In the current NMF I also take `abs(adj)`. But one could of course explore whether taking sign into account is not better.
+- What about using signs? The Jaccard approach below seems to not use them. In the current NMF I also take `abs(adj)`. But one could of course explore whether taking sign into account is better.
 - The current approach of finding "neighbourhoods" for each gene with the random projections, and then biclustering... -- Can the biclustering idea already be integrated earlier on?
 - Many variations of what happens in the next code chunk are possible: 
   1. Whether to do the matrix decompositions separately for the positive (up-regulated) and negative (down-regulated) neighbourhoods, or take the absolute value `abs(adj)`, as we do below. 
@@ -645,7 +645,7 @@ adjappr     <- wd %*% hd
 # We use this for seriation below. BEA_TSP seems to be sensitive to the absolute scale of the data (?), hence, the division of the geometric mean of d. 
 adjappr4ser <- wd %*% diag(adjnmf$d) %*% hd  / exp(mean(log(adjnmf$d))) 
 
-# Subsampling for visualisation -  there are no more pixels on the display anyway, and saves time.
+# Subsampling for visualisation
 csub        <- sample(nrow(adj), 2048)
 adjs        <- abs(adj[csub, ])
 adjapprs    <- adjappr[csub, ]
@@ -658,7 +658,6 @@ adjappr4ser <- adjappr4ser[csub, ]
 #| layout-ncol: 2
 #| outwidth: "100%"
 #| message: false
-library("seriation")
 ser <- seriate(adjappr4ser, method = "BEA_TSP")
 myhm <- function(x, name = deparse(substitute(x)), col = colorRamp2(range(x), c("#ffffff", "RoyalBlue"))) {
   Heatmap(x, name = name, col = col, row_title = "cells", column_title = "genes", 
