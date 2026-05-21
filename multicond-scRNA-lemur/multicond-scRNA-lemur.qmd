@@ -418,7 +418,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to go a step further and know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. In this step, which was not yet described by @AhlmannEltze:NatGen:2025, we use biclustering to address this question.
 
-### Why clustering neighborhoods is not enough
+### Clustering neighborhoods is not enough
 
 As we already determined neighborhoods (i.e. subsets of cells) with coherent expression of a single gene, it seems only natural to further process these to identify superseeding neighborhoods, where the subset of cells shows coherent expression (or suppression) of multiple genes.
 
@@ -798,10 +798,6 @@ mosaicplot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells
            main = "", las = 2, color =  c("#0057B7", "#FFD700"))
 ```
 
-TO DO:
-
-- Do gene set enrichment / hallmarks on the genes
-- Move the below challenge "Looking at the coverage of the biclusters" into the Appendix —  hopefully it can serve towards future development of LEMUR2
 
 ::: {.callout-note collapse="true"}
 ## Challenge: Other biclusters
