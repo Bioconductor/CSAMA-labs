@@ -1,7 +1,7 @@
 ---
 title: "Randomness and the linear model"
 author: "Michael Love"
-date: "July 6, 2025"
+date: "May 24, 2026"
 license: "CC-BY"
 format: 
   html:
