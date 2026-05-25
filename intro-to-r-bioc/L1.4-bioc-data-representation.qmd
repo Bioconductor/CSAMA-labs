@@ -1,10 +1,10 @@
 ---
 title: "Lab 1.4: Representations for biomolecular sequences"
 author: Martin Morgan, Sonali Arora, Lori Shepherd, [Davide Risso](mailto:davide.risso@unipd.it), [Ilaria Billato](mailto:ilaria.billato@phd.unipd.it)
-date: 25 May 2026
+date: 25 Maggio 2026
 format:
   html:
-    embed-resources: false
+    embed-resources: true
     page-layout: full
     css: ../csama.css
     lightbox: true
