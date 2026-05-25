@@ -677,28 +677,6 @@ if (!all(diff(log(adjnmf$d)) > (-2)))   # want no extreme jumps in 'eigenvalues'
   stop(paste("RcppML::nmf returned singular values of d:", paste(signif(adjnmf$d, 4), collapse = ", ")))
 # possible alternative approach: call RcppML::nmf with large k, and then inspect the d values to see how many components there really are. 
 ```
-::: {.callout-note collapse="true"}
-## Challenge: Plotting the adjacency matrix
-
-Plot  `adj_jn`, i.e., the matrix spanned by the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
-```{r}
-#| label: fig-adj-jn
-#| fig-width: 5
-#| fig-height: 7
-#| out-width: "50%"
-#| fig-cap: "The matrix approximation from the j-th NMF component"
-Heatmap(adj_jn[csub, ][order(adjnmf$w[csub, j]), order(adjnmf$h[j, ])], 
-  name = "adj", col = colorRamp2(c(0, 1), c("#ffffff", "RoyalBlue")),
-  row_title = "cells", column_title = "genes", use_raster = TRUE,
-  show_row_names = FALSE, show_column_names = FALSE, cluster_rows = FALSE, cluster_columns = FALSE
-)
-```
-
-Note that here we use a [sequential colour map rather than a diverging](https://www.huber.embl.de/msmb/03-chap.html#sec-graphics-color) one, since the values are all positive.
-To order the rows and columns in this plot, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering^[See, e.g., <https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html> Section 2.3.4.]. 
-
-Similar plots can easily be produced for other values of `j`.
-:::
 
 ::: {.callout-note collapse="true"}
 ## Challenge: Recruiting cells and genes to a bicluster
@@ -763,7 +741,7 @@ mycolourramp <- colorRamp2(c(0, 1), c("#f0f0f0", "royalblue2"))
 #| fig-width: 5
 #| fig-height: 7
 #| out-width: "75%"
-#| fig-cap: ""
+#| fig-cap: "Heatmap of the adjacency matrix with indicated bicluster."
 Heatmap(mat, name = "adj", col = mycolourramp,
   row_order = get_order(ser, 1), column_order = get_order(ser, 2),
   row_title = "cells", column_title = "genes", use_raster = TRUE,
@@ -773,15 +751,20 @@ Heatmap(mat, name = "adj", col = mycolourramp,
 )
 ```
 
-We can now revisit @fig-lemur-umap-celltypes and compare it with our bicluster.
+We see in @fig-component1-heatmap that the matrix factorization has indeed identified a coherent block in the adjacency matrix. In other words, we identified a set of cells that co-expresses many different genes. The entire procedure was unsupervised. At no point did we have to use potential prior knowledge about cells or genes other than the expression data predicted from lemur.
+
+We can now revisit @fig-lemur-umap-celltypes and compare it with our bicluster. We can notice two things about its location on the UMAP.
+
+1. The bicluster forms a connected region. Thus, cells belonging to the bicluster are similar in their overall expression profile. Note that this does not necessarily have to hold. A bicluster could also be disconnected, as the a bicluster indicates a shared subset of the gene expression profile only.
+2. The cell type composition is not homogenous. The bicluster contains different cell types.
+
 ```{r}
 #| label: fig-bicluster-and-celltypes
 #| layout-ncol: 2
 #| fig-width: 5
 #| fig-height: 5
-#| fig-cap: 
-#|   - Same as @fig-lemur-umap-celltypes
-#|   - The `j`-th bicluster
+#| fig-cap: ""
+
 ord <- order(bic_cells)
 gglem <- as_tibble(colData(sce)) |>
   mutate(
@@ -790,9 +773,11 @@ gglem <- as_tibble(colData(sce)) |>
   arrange(bic) |>    
   ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
 
-gglem + geom_point(aes(colour = cell), size = 0.3) 
+#gglem + geom_point(aes(colour = cell), size = 0.3) 
 gglem + geom_point(aes(colour = bic), size = 0.3) + scale_colour_discrete(palette = mycolours)
 ```
+
+
 
 ```{r}
 #| label: fig-table-celltype-bic
@@ -803,6 +788,7 @@ mosaicplot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells
            main = "", las = 2, color =  c("#0057B7", "#FFD700"))
 ```
 
+To close this section, let us briefly dive more into this last point. The exact cell type composition of the bicluster can be seen in @fig-table-celltype-bic. Indeed, this bicluster consists mostly of three to four different cell types. This highlights one of the key advantages of the label-free differential expression analysis as performed by lemur. The subsequent biclustering allowerd us to identify a coherent gene programmes as a response to the condition contrast. This programme is found to be relevant in a connected subset of cells encompassing different cell types. Thus, we do not only find subpopulations in a given cell type with a unique response. We even find subpopulations of other cell types that _share_ the same response programme!
 
 
 
@@ -815,6 +801,7 @@ mosaicplot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells
 - continuous covariates, e.g., time courses, whose effects can also be modeled using smooth non-linear functions (spline regression). 
 
 For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
+
 
 # Appendix: Variations and extensions to the workflow {#sec-appendix}
 
@@ -1047,6 +1034,31 @@ seur_obj2 <- Seurat::IntegrateLayers(object = seur_obj2, method = Seurat::CCAInt
 seur_obj2 <- Seurat::RunUMAP(seur_obj2, dims = 1:30, reduction = "integrated.cca")
 Seurat::DimPlot(seur_obj2, reduction = "umap", group.by = "stim")
 ```
+:::
+
+## Adjacency matrix
+
+::: {.callout-note collapse="true"}
+## Challenge: Plotting the adjacency matrix
+
+Plot  `adj_jn`, i.e., the matrix spanned by the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
+```{r}
+#| label: fig-adj-jn
+#| fig-width: 5
+#| fig-height: 7
+#| out-width: "50%"
+#| fig-cap: "The matrix approximation from the j-th NMF component"
+Heatmap(adj_jn[csub, ][order(adjnmf$w[csub, j]), order(adjnmf$h[j, ])], 
+  name = "adj", col = colorRamp2(c(0, 1), c("#ffffff", "RoyalBlue")),
+  row_title = "cells", column_title = "genes", use_raster = TRUE,
+  show_row_names = FALSE, show_column_names = FALSE, cluster_rows = FALSE, cluster_columns = FALSE
+)
+```
+
+Note that here we use a [sequential colour map rather than a diverging](https://www.huber.embl.de/msmb/03-chap.html#sec-graphics-color) one, since the values are all positive.
+To order the rows and columns in this plot, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering^[See, e.g., <https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html> Section 2.3.4.]. 
+
+Similar plots can easily be produced for other values of `j`.
 :::
 
 
