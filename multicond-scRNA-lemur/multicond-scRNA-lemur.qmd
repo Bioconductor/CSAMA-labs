@@ -788,8 +788,7 @@ mosaicplot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells
            main = "", las = 2, color =  c("#0057B7", "#FFD700"))
 ```
 
-To close this section, let us briefly dive more into this last point. The exact cell type composition of the bicluster can be seen in @fig-table-celltype-bic. Indeed, this bicluster consists mostly of three to four different cell types. This highlights one of the key advantages of the label-free differential expression analysis as performed by lemur. The subsequent biclustering allowerd us to identify a coherent gene programmes as a response to the condition contrast. This programme is found to be relevant in a connected subset of cells encompassing different cell types. Thus, we do not only find subpopulations in a given cell type with a unique response. We even find subpopulations of other cell types that _share_ the same response programme!
-
+To close this section, let us briefly dive more into this last point. The exact cell type composition of the bicluster can be seen in @fig-table-celltype-bic. Indeed, this bicluster consists mostly of three to four different cell types. This highlights one of the key advantages of the label-free differential expression analysis as performed by lemur. The subsequent biclustering allowerd us to identify a coherent gene programmes as a response to the condition contrast. This programme is found to be relevant in a connected subset of cells encompassing different cell types. Thus, we do not only find subpopulations in a given cell type with a unique response. We even find subpopulations of other cell types that share _the same_ response programme!
 
 
 # Outlook
@@ -802,6 +801,9 @@ To close this section, let us briefly dive more into this last point. The exact 
 
 For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
 
+`lemur` provides a label-free differential expression prediction at true single cell resolution. In its current form, `lemur` can automatically infer neighborhoods (i.e. subsets) of cells that show a consistent differential expression pattern. These neighborhoods can span multiple cell types, and are more generally complementary to other types of meta data. The combination of neighborhoods, as well as a detailed analysis of their composition allows to easily identify response patterns that are otherwise easier to miss in traditional pseudobulk analysis.
+
+A dedicated package for biclustering of the predicted differential expression is expected to be released soon. This allows to find not subsets of differential expression for the individual genes, but rather subsets of genes that show coherent up- or downregulation in a subset of cells. Thus, it will be possible to identify coherent gene response programmes and which cells are using them in an unsupervised manner. Just as for the individual gene neighborhoods, these biclusters are agnostic to cell types and other labels and, by design, allow to find response patterns independent of meta data labels that later can help in guiding biological interpretation.
 
 # Appendix: Variations and extensions to the workflow {#sec-appendix}
 
@@ -1009,9 +1011,6 @@ as_tibble(colData(sce)) |>
     coord_fixed()
 ```
 
-::: {.callout-note}
-## Challenge: How much do the results change if you change the default parameters in Harmony?
-:::
 
 ::: {.callout-note collapse="true"}
 ## Challenge: How do you do integration in Seurat?
