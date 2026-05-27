@@ -35,13 +35,13 @@ execute:
 # What you will learn in this lab
 
 Our objective is to compare single cell RNA-seq data from multiple tissue samples across conditions. 
-An obvious approach is to divide the constituent cells into clusters meant to represent cell types and, for each cluster separately, do pseudo-bulk differential expression with methods such as edgeR or DESEq2. 
+An obvious approach is to divide the constituent cells into clusters meant to represent cell types and, for each cluster separately, do pseudo-bulk differential expression with methods such as edgeR or DESEq2. t 
 However, such discrete categorization tends to be an unsatisfactory model of the underlying biology. 
 
 Here, we use _latent embedding multivariate regression_ (LEMUR) (@AhlmannEltze:NatGen:2025), a model that operates without or before commitment to discrete cell type categorization. 
 LEMUR fits a regression model that _predicts_ for each cell the expression of its genes in each of the conditions.
 Note that for any given cell, the expression of its genes was only _observed_ in one replicate of one condition.
-The predictions enable us to compute any _contrast_^[the technical term for differential expression effects] of interest, such as: how would the expression of a certain gene in a particular cell differ between treatment and control condition? It even lets us inter- and extrapolate between conditions, or consider more complex experimental designs such as factorial analysis, blocking factors, or continuous covariates. Given such contrasts, we can do _biclustering_ to find groups of genes that behave similarly in a group of cells. Such a group of genes may then be interpreted in terms of pathways, such a groups of cells as a cell types, a combinations of several cell types, or subsets of a cell types.
+The predictions enable us to compute any _contrast_^[the technical term for differential expression effects] of interest, such as: how would the expression of a certain gene in a particular cell differ between treatment and control condition? It even lets us inter- and extrapolate between conditions, or consider more complex experimental designs such as factorial analysis, blocking factors, or continuous covariates. Given such contrasts, we can do _biclustering_ to find groups of genes that behave similarly across a group of cells. Such a group of genes may then be interpreted in terms of pathways or a coordinated gene programme. Groups of cells is not necessarily associated to a single cell type, but also combinations of several cell types, or subsets within cell types.
 
 ![Figure 1 from @AhlmannEltze:NatGen:2025.](images/lemur_figure.png)
 
@@ -418,273 +418,11 @@ as_tibble(colData(sce), rownames = "cell_name") |>
 
 So far, we have identified cell neighbourhoods for individual genes. While this is useful, the results for hundreds of genes can be overwhelming, and we may want to go a step further and know whether certain sets of genes have quite similar neighbourhoods, i.e., are co-differentially expressed. In this step, which was not yet described by @AhlmannEltze:NatGen:2025, we use biclustering to address this question.
 
-We start by observing that the neighbourhoods we discovered above can be visualised as a bipartite graph or as an adjacency matrix. A bipartite graph has two types of nodes, and edges only between nodes of different types. In our case, the nodes are genes and cells, and an edge exists between a cell and a gene if the cell is in the gene's neighbourhood. Let's visualise it.
+### Clustering neighborhoods is not enough
 
-```{r}
-#| label: adjmat
-adj <- neighbourhoods_to_adjacency_matrix(dplyr::filter(nei, adj_pval < 0.15), fit, out = "matrix")
-dim(adj)
-```
+As we already determined neighborhoods (i.e. subsets of cells) with coherent expression of a single gene, it seems only natural to further process these to identify superseeding neighborhoods, where the subset of cells shows coherent expression (or suppression) of multiple genes.
 
-The conversion from the `nei` object to the adjacency matrix `adj` has lost / garbled the original order of cells in the `sce` data object. For comparisons below, and to avoid bugs, we align the orders.
-
-```{r}
-#| label: syncorder
-stopifnot(setequal(colnames(sce), rownames(adj)))
-adj = adj[colnames(sce), ]
-```
-
-```{r}
-#| label: fig-hist-rowsums-adjmat
-#| layout-ncol: 2
-#| echo: false
-#| eval: false
-ggplot(tibble(rs = rowSums(adj)), aes(x = rs)) + geom_histogram(bins = 100)
-ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
-```
-Let's look at a heatmap rendering of `adj`. We use the `Heatmap` function from the `ComplexHeatmap` package. Calling it needs a litany of parameters to customise the plot as we
-want it, but nothing complicated. Note the random subsetting of rows by `csub`. This is because the `r nrow(adj)` rows of `adj` are too many to see on the screen anyway (your screen will likely not have more than a few thousand pixels in vertical direction), and the subsetting saves computation time.
-```{r}
-#| label: fig-adj-heatmap
-#| message: false
-#| fig-width: 5
-#| fig-height: 7
-#| out-width: "75%"
-#| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Yellow: inside the neighbourhood, LFC<0; blue: inside the neighbourhood, LFC>0; light grey: outside (no edge)."
-library("ComplexHeatmap")
-library("circlize")
-require("magick")
-csub <- sample(nrow(adj), 2048) 
-Heatmap(adj[csub, ], name = "adj", col = colorRamp2(c(-1, 0, 1), c("#FFD700", "#f0f0f0", "#0057B7")),
-  row_title = "cells", column_title = "genes", use_raster = TRUE,
-  show_row_names = FALSE, show_column_names = FALSE, show_row_dend = FALSE, show_column_dend = FALSE)
-```
-
-Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret these as biological processes or regulatory programmes. Similarly, we can look for sets of cells that show differential co-expression. We can use these to refine our notions of cell type and state defined from static expression maps, to discover new subpopulations, or commonalities between known populations.
-
-::: {.callout-warning collapse="false"}
-## Biclustering
-[Biclustering or coclustering](https://en.wikipedia.org/wiki/Biclustering) is a data analysis technique that simultaneously groups rows and columns of a matrix to identify subsets of rows that exhibit coherent patterns within subsets of columns. 
-:::
-
-A dedicated package for biclustering of `lemur` predictions is currently under development by the authors of this lab, and we aim to release it soon. The approach is based on low-rank (and possibly sparse) matrix decomposition of the adjacency matrix (as in @fig-adj-heatmap) followed by an algorithm to assign cells and genes to biclusters, designed such that a cell or a gene can be part of _multiple_  biclusters. This is motivated by the biological observation that a gene can contribute to multiple biological processes, and cells can respond to condition changes through up- or downregulation of multiple processes. 
-
-::: {.callout-note collapse="true"}
-## Notes for future development
-- Let's find a better name than _master neighbourhood_ (sounds like something from colonial times Africa or America; see also <https://claude.ai/share/e03f45ee-cf4c-4653-bc2e-3db1a9e6b0a5>). I then [asked the chatbot for suggestions](https://claude.ai/share/b582b251-d02f-4e64-a4a4-4f7a9f65afbe). Shall we just go for "bicluster of cells" and "bicluster of genes"? I think the name "neighbourhood" confuses many people, anyway, it is too abstract, it's one of the mistakes of the existing paper.
-- What about using signs? The Jaccard approach below seems to not use them. In the current NMF I also take `abs(adj)`. But one could of course explore whether taking sign into account is better.
-- The current approach of finding "neighbourhoods" for each gene with the random projections, and then biclustering... -- Can the biclustering idea already be integrated earlier on?
-- Many variations of what happens in the next code chunk are possible: 
-  1. Whether to do the matrix decompositions separately for the positive (up-regulated) and negative (down-regulated) neighbourhoods, or take the absolute value `abs(adj)`, as we do below. 
-  2. Choice between singular value decomposition (SVD; for which we below use the `irlba` method from the eponymous package; and where probably some additional sparsity-inducing regularisation is warranted) or non-negative matrix factorization (NMF). The positivity constraint seems relevant and necessary for adjacency matrices.
-:::
-
-```{r}
-#| label: svd
-#| echo: false
-#| eval: false
-adjsvd <- irlba::irlba(abs(adj))
-adj_js <- with(adjsvd, u[, j, drop = FALSE] %*% t(v[, j, drop = FALSE]) * d[j])
-```
-```{r}
-#| label: nmf
-#| message: false
-j <- 2
-adjnmf <- RcppML::nmf(abs(adj), k = 10, verbose = FALSE, tol = 9.54e-07, maxit = 256)
-adj_jn <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])  # the matrix approximation from the j-th NMF component
-```
-```{r}
-#| label: checknmf
-#| echo: false
-if (!all(diff(log(adjnmf$d)) > (-2)))   # want no extreme jumps in 'eigenvalues'
-  stop(paste("RcppML::nmf returned singular values of d:", paste(signif(adjnmf$d, 4), collapse = ", ")))
-# possible alternative approach: call RcppML::nmf with large k, and then inspect the d values to see how many components there really are. 
-```
-::: {.callout-note collapse="true"}
-## Plot `adj_jn`, i.e., the matrix spanned by the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
-```{r}
-#| label: fig-adj-jn
-#| fig-width: 5
-#| fig-height: 7
-#| out-width: "50%"
-#| fig-cap: "The matrix approximation from the j-th NMF component"
-Heatmap(adj_jn[csub, ][order(adjnmf$w[csub, j]), order(adjnmf$h[j, ])], 
-  name = "adj", col = colorRamp2(c(0, 1), c("#ffffff", "RoyalBlue")),
-  row_title = "cells", column_title = "genes", use_raster = TRUE,
-  show_row_names = FALSE, show_column_names = FALSE, cluster_rows = FALSE, cluster_columns = FALSE
-)
-```
-Note that here we use a [sequential colour map rather than a diverging](https://www.huber.embl.de/msmb/03-chap.html#sec-graphics-color) one, since the values are all positive.
-To order the rows and columns in this plot, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering^[See, e.g., <https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html> Section 2.3.4.]. 
-
-Bonus: produce similar plots for other values of `j`.
-:::
-
-::: {.callout-note collapse="true"}
-## Plot the histograms of the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`.
-```{r}
-#| label: fig-hist-nmfweights
-#| layout-ncol: 2
-#| echo: true
-#| eval: true
-#| fig-cap: 
-#|   - "Distribution of NMF coefficients: w"
-#|   - "Distribution of NMF coefficients: h"
-ggplot(tibble(w = adjnmf$w[, j]), aes(x = w)) + geom_histogram(bins = 100)
-ggplot(tibble(h = adjnmf$h[j, ]), aes(x = h)) + geom_histogram(bins = 30)
-```
-:::
-
-Let's pick a bicluster. The choice of the thresholds can be motivated by the histograms above. Here we automate this by fitting a two-component mixture model with the $k$-means algorithm with $k=2$, and taking the midpoint.
-
-```{r}
-#| label: pick-bicluster
-find_threshold <- function(x) { mean(kmeans(x, centers = 2)$centers) }
-threshold_h <- find_threshold(adjnmf$h[j, ])
-threshold_w <- find_threshold(adjnmf$w[, j])
-c(threshold_h, threshold_w )
-bic_genes = adjnmf$h[j, , drop = FALSE] > threshold_h
-bic_cells = adjnmf$w[, j, drop = FALSE] > threshold_w  
-```
-
-::: {.callout-note collapse="true"}
-## How many genes and cells are selected for this bicluster?
-```{r}
-#| label: tablebic
-table(bic_genes)
-table(bic_cells)
-```
-:::
-
-Now we are able to visualize this bicluster on top of a heatmap like in @fig-adj-heatmap. Note that while @fig-adj-heatmap distinguishes between -1 and +1 for indicating neighbourhoods in which the gene is down- or up-regulated, we have here chosen to do the NMF on the absolute values. 
-
-Most of the code below is `Heatmap` bureaucracy, but it also contains a call to the `seriate` function for ordering the rows and columns of the matrix using _seriation_, i.e., a one-dimensional embedding of multivariate objects. For this, we use a travelling salesperson algorithm as implemented in the [seriation package](https://github.com/mhahsler/seriation). The seriation is dominated by bicluster membership (the `LARGE` term), and then, by the finer structure within `mat` (the absolute value of the subsampled adjacency matrix) itself. The blue bars at the top and right sides of the matrix indicate membership in our bicluster (`j=``r j`).
-
-```{r}
-#| label: fig-component1-heatmap
-#| fig-width: 5
-#| fig-height: 7
-#| out-width: "75%"
-#| fig-cap: ""
-library("seriation")
-LARGE <- 10
-mat <- abs(adj)[csub, ] 
-ser <- seriate(mat + LARGE * (bic_cells[csub, , drop = FALSE] %*% bic_genes), method = "BEA_TSP")
-mycolours <- c(`FALSE` = "#f0f0f0", `TRUE` = "royalBlue4")
-mycolourramp <- colorRamp2(c(0, 1), c("#f0f0f0", "royalblue2"))
-Heatmap(mat, name = "adj", col = mycolourramp,
-  row_order = get_order(ser, 1), column_order = get_order(ser, 2),
-  row_title = "cells", column_title = "genes", use_raster = TRUE,
-  show_row_names = FALSE, show_column_names = FALSE, cluster_rows = FALSE, cluster_columns = FALSE, show_heatmap_legend = FALSE,
-  right_annotation = HeatmapAnnotation(inside = as.factor(bic_cells[csub]), which = "row", col = list(inside = mycolours), show_legend = FALSE),
-  top_annotation   = HeatmapAnnotation(inside = as.factor(bic_genes),    which = "column", col = list(inside = mycolours), show_legend = FALSE)
-)
-```
-
-We can now revisit @fig-lemur-umap-celltypes and compare it with our bicluster.
-```{r}
-#| label: fig-bicluster-and-celltypes
-#| layout-ncol: 2
-#| fig-width: 5
-#| fig-height: 5
-#| fig-cap: 
-#|   - Same as @fig-lemur-umap-celltypes
-#|   - The `j`-th bicluster
-ord <- order(bic_cells)
-gglem <- as_tibble(colData(sce)) |>
-  mutate(
-    umap = lemur_umap,
-    bic = bic_cells) |>
-  arrange(bic) |>    
-  ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
-
-gglem + geom_point(aes(colour = cell), size = 0.3) 
-gglem + geom_point(aes(colour = bic), size = 0.3) + scale_colour_discrete(palette = mycolours)
-```
-
-```{r}
-#| label: fig-table-celltype-bic
-#| fig-width: 5
-#| fig-height: 5.5
-#| fig-cap: "Cell type annotations versus membership in bicluster `j`. How would you biologically interpret this bicluster?"
-mosaicplot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), 
-           main = "", las = 2, color =  c("#0057B7", "#FFD700"))
-```
-
-TO DO:
-
-- Do gene set enrichment / hallmarks on the genes
-- Move the below challenge "Looking at the coverage of the biclusters" into the Appendix —  hopefully it can serve towards future development of LEMUR2
-
-::: {.callout-note collapse="true"}
-## Challenge: Other biclusters
-Redo the above enrichment analysis for cell types and gene pathways for another cluster (another `j`).
-:::
-
-::: {.callout-note collapse="true"}
-## Challenge: Looking at the coverage of the biclusters
-Create a plot like @fig-adj-jn for the linear combination of all `r length(adjnmf$d)` factors, i.e.,
-visualize the low-rank (`k=``r length(adjnmf$d)`) approximation and compare it to @fig-adj-heatmap.
-
-```{r}
-#| label: morenmf
-#| message: false
-dichotomise <- function(x) {
-  # `cluster` is either 1 or 2, `centers` are the coordinates of the cluster centers, the `sign` function returns values 
-  # of -1 or +1 depending on the relative position of the centers along the real axis. The expression below gives
-  # `TRUE` if a point is in the cluster with the larger center, `FALSE` otherwise.
-  with(kmeans(as.vector(x), centers = 2), 3 + sign(as.vector(diff(centers))) == 2 * cluster)
-}
-
-wd <- apply(adjnmf$w, 2, dichotomise)
-hd <- apply(adjnmf$h, 1, dichotomise) |> t()
-
-# We use this for visualization below.
-adjappr     <- wd %*% hd
-
-# We use this for seriation below. BEA_TSP seems to be sensitive to the absolute scale of the data (?), hence, the division of the geometric mean of d. 
-adjappr4ser <- wd %*% diag(adjnmf$d) %*% hd  / exp(mean(log(adjnmf$d))) 
-
-# Subsampling for visualisation
-csub        <- sample(nrow(adj), 2048)
-adjs        <- abs(adj[csub, ])
-adjapprs    <- adjappr[csub, ]
-adjappr4ser <- adjappr4ser[csub, ]
-```
-```{r}
-#| label: fig-morenmf
-#| fig-width: 5
-#| fig-height: 7
-#| layout-ncol: 2
-#| outwidth: "100%"
-#| message: false
-ser <- seriate(adjappr4ser, method = "BEA_TSP")
-myhm <- function(x, name = deparse(substitute(x)), col = colorRamp2(range(x), c("#ffffff", "RoyalBlue"))) {
-  Heatmap(x, name = name, col = col, row_title = "cells", column_title = "genes", 
-      row_order = get_order(ser, 1), column_order = get_order(ser, 2),
-      show_row_names = FALSE, show_column_names = FALSE, use_raster = TRUE)
-}
-myhm(adjs)
-myhm(adjapprs)
-```
-Note how some biclusters are overlapping, as indicated by elements of `adjappr` having values above 1:
-```{r}
-#| label: nonoverlap
-table(adjappr)
-```
-```{r}
-#| label: fig-biclustersseparately
-#| fig-width: 4
-#| fig-height: 6
-#| layout-ncol: 4
-#| outwidth: "100%"
-#| message: false
-for (j in seq_len(ncol(wd)))
-  print(myhm(wd[csub, j, drop = FALSE]  %*% hd[j, , drop = FALSE], 
-             name = sprintf("j=%d", j),
-             col = colorRamp2(c(0, 1), c("#d0d0d0", "RoyalBlue"))))
-```
-:::
+Indeed, taking the previously determined neighborhoods, we can easily quantify their similarity using a simple Jaccard index ($J(A,B) = \frac{|A \cap B|}{|A \cup B|}$).
 
 ```{r}
 #| label: jaccard
@@ -699,7 +437,7 @@ jaccard_index <- function(a, b) {
   length(intersect(a, b)) / length(union(a, b))
 }
 
-jaccard_df <- nei |> filter(adj_pval < 0.05) |>
+jaccard_df <- nei |> filter(adj_pval < 0.15) |>
   mutate(
     jaccard = map_dbl(neighborhood, ~ jaccard_index(.x, ref_cells)),
     mean_expr_inside = map2_dbl(
@@ -712,13 +450,14 @@ jaccard_df <- nei |> filter(adj_pval < 0.05) |>
   arrange(desc(jaccard))
 
 head(jaccard_df, 10)
+
 ```
 
-As we can see, many neighbourhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.9$, we obtain:
+As we can see, many neighbourhoods show strong overlap, and the mean expression indicates that we find both up- and downregulated genes. Setting a threshold of, say, $J > 0.8$, we obtain:
 
 ```{r}
 recruited <- jaccard_df |>
-  filter(jaccard > 0.9) |>
+  filter(jaccard > 0.8) |>
   arrange(desc(jaccard))
 
 recruited_genes <- recruited$name
@@ -728,45 +467,54 @@ recruited_neighborhoods <- nei |>
   arrange(match(name, recruited_genes)) |>
   pull(neighborhood)
 
-master_neighborhood <- recruited_neighborhoods |>
+joined_neighborhood <- recruited_neighborhoods |>
   as.list() |>
   purrr::reduce(intersect)
 
-master_result <- list(
+joined_result <- list(
   genes = recruited_genes,
-  neighborhood = master_neighborhood
+  neighborhood = joined_neighborhood
 )
+
+print(length(joined_result$genes))
+print(length(joined_result$neighborhood))
+
 ```
 
 ```{r}
-#| label: fig-master-neighbourhood
+#| label: fig-joined-neighbourhood
 #| fig-cap: 
-#|   - Master neighbourhood from repeated intersection of gene neighbourhoods of similar Jaccard index
-master_inside_df <- tibble(
+#|   - Joined neighbourhood from repeated intersection of gene neighbourhoods of similar Jaccard index
+joined_inside_df <- tibble(
   cell_name = colnames(fit),
-  inside = cell_name %in% master_result$neighborhood
+  inside = cell_name %in% joined_result$neighborhood
 )
 
-p_master_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
+p_joined_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
   mutate(umap = lemur_umap) |>
-  left_join(master_inside_df, by = "cell_name") |>
+  left_join(joined_inside_df, by = "cell_name") |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
   geom_point(aes(colour = inside), size = 0.3) +
   scale_colour_manual(values = c(`FALSE` = "grey80", `TRUE` = "red")) +
   coord_fixed() +
-  labs(title = "Master neighborhood", colour = "Inside")
+  labs(title = "Joined neighborhood", colour = "Inside")
 
-p_master_neighborhood
+p_joined_neighborhood
 ```
 
-We now have a list of `{r length(master_result$genes)}` genes showing significant differential expression within a neighbourhood of `{r length(master_result$neighborhood)}` cells. To visualise the result, we can colour all cells belonging to the master neighbourhood as shown in @fig-master-neighbourhood.
+We now have a list of `{r} length(joined_result$genes)` genes showing significant differential expression within a neighbourhood of `{r} length(joined_result$neighborhood)` cells.
+To visualise the result, we can colour all cells belonging to the joined neighbourhood as shown in @fig-joined-neighbourhood.
+
+::: {.callout-note collapse="true"}
+## Challenge: Confirming neighborhood expression patterns on a UMAP
+
 
 ```{r, paged.print=FALSE}
 #| label: fig-umap-bicluster-selected-genes
 #| fig-cap: 
-#|   - Differential expression of selected genes associated to the master neighbourhood we constructed earlier.
+#|   - Differential expression of selected genes associated to the joined neighbourhood we constructed earlier.
 
-genes4 <- master_result$genes[1:4]
+genes4 <- joined_result$genes[1:4]
 
 gene_expr_df <- as.data.frame(t(assay(fit, "DE")[genes4, , drop = FALSE])) |>
   rownames_to_column("cell_name") |>
@@ -792,12 +540,20 @@ p_four_genes <- as_tibble(colData(sce), rownames = "cell_name") |>
 p_four_genes
 ```
 
-We can visually confirm that the identified master neighbourhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified and plotting their differential expression on the UMAP in @fig-umap-bicluster-selected-genes.
 
-Note that gene expression need not be restricted to that neighbourhood. Indeed, the intersection approach only guarantees to identify a neighbourhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighbourhoods. This highlights once again the need to identify non-exclusive and non-exhaustive biclusters, since genes can participate in multiple programmes, and programmes themselves can differ across cell neighbourhoods.
+
+We can visually confirm that the identified joined neighbourhood indeed shows coherent up- or downregulation across these genes. For example, taking the first four genes we identified and plotting their differential expression on the UMAP in @fig-umap-bicluster-selected-genes.
+
+:::
+
+Note that gene expression need not be restricted to that joined neighbourhood we constructed. Indeed, the intersection approach only guarantees to identify a neighbourhood of coherent expression patterns -- any gene belonging to this “bicluster” may also show a very different expression pattern in other cell neighbourhoods. This could partially be remedied by also including subsets of cells instead of almost perfect overlap. However, this ansatz is still plagued by choosing somewhat arbitrary selection thresholds, and cuts tend to be overly conservative and therefore limit statistical power.
+
+Ideally, we want to process the differential expression from LEMUR in an unsupervised fashion. Also, we want to identify non-exclusive and non-exhaustive biclusters, since cells can react to a changing condition by changing multiple programmes, and genes themselves are not exclusive to individual response programmes.
+
+In the next section, we illustrate the usefulness of matrix factorization techniques to extract biclusters that are non-exhaustive and non-exclusive by design.
 
 ::: {.callout-note collapse="true"}
-## Challenge: Quantifying the coherence of biclusters
+## Challenge: Quantifying the coherence of "biclusters"
 The goal of identifying biclusters and neighbourhoods of co-expression is not only to find genes that are, for example, significantly up- or downregulated within a neighbourhood, but rather to identify genes that show a coherent expression pattern. For example, if there is a gradient of differential expression within that neighbourhood, it would be interesting to see if other genes from the bicluster follow the same trend. In that sense, coherence is a stronger condition than simply averaged regulation over a given neighbourhood.
 
 If all genes are indeed showing perfectly coherent expression, the bicluster submatrix has exactly one axis of variation. In other words, for each cell and gene combination the signal decomposes into a gene and a cell intrinsic part $X_{gc} = G_g C_c$. Equivalently, the submatrix simply has $\mathrm{rank}(X) = 1$.
@@ -807,9 +563,10 @@ This can be quantified using SVD. Let $\sigma_k$ denote the (sorted) singular va
 ```{r, paged.print=FALSE}
 #| label: submatrix-coherence-spectrum
 #| fig-cap: 
-#|   - Spectrum of singular values of the bicluster we constructed.
-X_sub <- assay(fit, "DE")[master_result$genes,
-                          master_result$neighborhood,
+#|   - Spectrum of singular values of the "bicluster" we constructed.
+
+X_sub <- assay(fit, "DE")[joined_result$genes,
+                          joined_result$neighborhood,
                           drop = FALSE]
 
 sv <- svd(X_sub)
@@ -844,9 +601,194 @@ p_spectrum <- ggplot(
 
 print(p_spectrum)
 ```
+:::
+
+
+
+### Biclustering from matrix factorization
+
+This last section is more advanced topic. It works out a complete example of how biclusters can be found using matrix factorization techniques. Many of the ideas presented here are also the basis fo the dedicated package under development. The biclusters could be inferred directly from the differential expression matrix we found in Step 2. However, it can be convenient to  preprocess that matrix in a way that highlights the bicluster structure. Here we use the neighborhoods found in Step 4 to indiciate if a gene is significantly expressed (in the neighborhood) or not (outside).
+
+This binary matrix corresponds to the adjacency matrix of a bipartite graph of genes and cells. A bipartite graph has two types of nodes, and edges only between nodes of different types. In our case, the nodes are genes and cells, and an edge exists between a cell and a gene if the cell is in the gene's neighbourhood. Let's visualise it.
+
+```{r}
+#| label: adjmat
+adj <- neighbourhoods_to_adjacency_matrix(dplyr::filter(nei, adj_pval < 0.15), fit, out = "matrix")
+dim(adj)
+```
+
+The conversion from the `nei` object to the adjacency matrix `adj` has lost / garbled the original order of cells in the `sce` data object. For comparisons below, and to avoid bugs, we align the orders.
+
+```{r}
+#| label: syncorder
+stopifnot(setequal(colnames(sce), rownames(adj)))
+adj = adj[colnames(sce), ]
+```
+
+```{r}
+#| label: fig-hist-rowsums-adjmat
+#| layout-ncol: 2
+#| echo: false
+#| eval: false
+ggplot(tibble(rs = rowSums(adj)), aes(x = rs)) + geom_histogram(bins = 100)
+ggplot(tibble(cs = colSums(adj)), aes(x = cs)) + geom_histogram(bins = 30)
+```
+
+Let's look at a heatmap rendering of `adj`. We use the `Heatmap` function from the `ComplexHeatmap` package. Calling it needs a litany of parameters to customise the plot as we want it, but nothing complicated. Note the random subsetting of rows by `csub`. This is because the `r nrow(adj)` rows of `adj` are too many to see on the screen anyway (your screen will likely not have more than a few thousand pixels in vertical direction), and the subsetting saves computation time.
+
+```{r}
+#| label: fig-adj-heatmap
+#| message: false
+#| fig-width: 5
+#| fig-height: 7
+#| out-width: "75%"
+#| fig-cap: "Adjacency matrix of the bipartite graph of genes and cells. Rows: cells, columns: genes. Yellow: inside the neighbourhood, LFC<0; blue: inside the neighbourhood, LFC>0; light grey: outside (no edge)."
+library("ComplexHeatmap")
+library("circlize")
+require("magick")
+csub <- sample(nrow(adj), 2048) 
+Heatmap(adj[csub, ], name = "adj", col = colorRamp2(c(-1, 0, 1), c("#FFD700", "#f0f0f0", "#0057B7")),
+  row_title = "cells", column_title = "genes", use_raster = TRUE,
+  show_row_names = FALSE, show_column_names = FALSE, show_row_dend = FALSE, show_column_dend = FALSE)
+```
+
+Looking at @fig-adj-heatmap, we immediately see that there is a lot of structure, and that bi- or coclustering of this matrix should be a fruitful approach to unravel that structure. That is, we are going to look for sets of genes who have similar neighbourhoods (cells). We may be able to interpret these as biological processes or regulatory programmes. Similarly, we can look for sets of cells that show differential co-expression. We can use these to refine our notions of cell type and state defined from static expression maps, to discover new subpopulations, or commonalities between known populations.
+
+::: {.callout-warning collapse="false"}
+## Biclustering
+[Biclustering or coclustering](https://en.wikipedia.org/wiki/Biclustering) is a data analysis technique that simultaneously groups rows and columns of a matrix to identify subsets of rows that exhibit coherent patterns within subsets of columns. 
+:::
+
+A dedicated package for biclustering of `lemur` predictions is currently under development by the authors of this lab, and we aim to release it soon. The approach is based on low-rank (and possibly sparse) matrix decomposition of the predicted differential expression matrix (as in @fig-adj-heatmap) followed by an algorithm to assign cells and genes to biclusters. It is designed such that a cell or a gene can be part of _multiple_  biclusters. This is motivated by the biological observation that a gene can contribute to multiple biological processes, and cells can respond to condition changes through up- or downregulation of multiple processes. 
+
+In the following we use non-negative matrix factorization (NMF) instead of the more widely known SVD. NMF factors a matrix as $X = WH$, where both $W$ and $H$ are subject to a non-negativity constraint. The main reason is that this makes the structure we find in $X$ additive, which is well-motivated from a biological perspective.
+
+```{r}
+#| label: nmf
+#| message: false
+j <- 2
+adjnmf <- RcppML::nmf(abs(adj), k = 10, verbose = FALSE, tol = 9.54e-07, maxit = 256)
+adj_jn <- with(adjnmf, w[, j, drop = FALSE] %*% h[j,, drop = FALSE] * d[j])  # the matrix approximation from the j-th NMF component
+```
+```{r}
+#| label: checknmf
+#| echo: false
+if (!all(diff(log(adjnmf$d)) > (-2)))   # want no extreme jumps in 'eigenvalues'
+  stop(paste("RcppML::nmf returned singular values of d:", paste(signif(adjnmf$d, 4), collapse = ", ")))
+# possible alternative approach: call RcppML::nmf with large k, and then inspect the d values to see how many components there really are. 
+```
+
+::: {.callout-note collapse="true"}
+## Challenge: Recruiting cells and genes to a bicluster
+
+The NMF decomposition finds continuous loadings of genes $W$ and cells $H$. Ideally, we wish to find a criterion to determine if a gene or cells should be attributed to a bicluster or not. 
+
+Let us begin by plotting the histograms of the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`.
+```{r}
+#| label: fig-hist-nmfweights
+#| layout-ncol: 2
+#| echo: true
+#| eval: true
+#| fig-cap: 
+#|   - "Distribution of NMF coefficients: w"
+#|   - "Distribution of NMF coefficients: h"
+ggplot(tibble(w = adjnmf$w[, j]), aes(x = w)) + geom_histogram(bins = 100)
+ggplot(tibble(h = adjnmf$h[j, ]), aes(x = h)) + geom_histogram(bins = 30)
+```
+
+
+Here we opt for a simple thresholding criterion. The choice of the thresholds can be motivated by the histograms above, where we observe roughly two peaks, the one closer to zero loading represents unwanted noise-modelling. The peak at larger values is our signal. Here we automate this by fitting a two-component mixture model with the $k$-means algorithm with $k=2$, and taking the midpoint.
+
+```{r}
+#| label: pick-bicluster
+find_threshold <- function(x) { mean(kmeans(x, centers = 2)$centers) }
+threshold_h <- find_threshold(adjnmf$h[j, ])
+threshold_w <- find_threshold(adjnmf$w[, j])
+c(threshold_h, threshold_w )
+bic_genes = adjnmf$h[j, , drop = FALSE] > threshold_h
+bic_cells = adjnmf$w[, j, drop = FALSE] > threshold_w  
+```
+
+A quick summary of the above procedure shows:
+
+```{r}
+#| label: tablebic
+table(bic_genes)
+table(bic_cells)
+```
+:::
+
+Now we are able to visualize bicluster memberships of genes and cells on top of a heatmap like in @fig-adj-heatmap.
+
+::: {.callout-note collapse="true"}
+## Heatmap bueraucracy
+Most of the code below is `Heatmap` bureaucracy, but it also contains a call to the `seriate` function for ordering the rows and columns of the matrix using _seriation_, i.e., a one-dimensional embedding of multivariate objects. For this, we use a travelling salesperson algorithm as implemented in the [seriation package](https://github.com/mhahsler/seriation). The seriation is dominated by bicluster membership (the `LARGE` term), and then, by the finer structure within `mat` (the absolute value of the subsampled adjacency matrix) itself. The blue bars at the top and right sides of the matrix indicate membership in our bicluster (`j=``r j`).
+
+
+```{r}
+library("seriation")
+LARGE <- 10
+mat <- abs(adj)[csub, ] 
+ser <- seriate(mat + LARGE * (bic_cells[csub, , drop = FALSE] %*% bic_genes), method = "BEA_TSP")
+mycolours <- c(`FALSE` = "#f0f0f0", `TRUE` = "royalBlue4")
+mycolourramp <- colorRamp2(c(0, 1), c("#f0f0f0", "royalblue2"))
+```
 
 :::
 
+```{r}
+#| label: fig-component1-heatmap
+#| fig-width: 5
+#| fig-height: 7
+#| out-width: "75%"
+#| fig-cap: "Heatmap of the adjacency matrix with indicated bicluster."
+Heatmap(mat, name = "adj", col = mycolourramp,
+  row_order = get_order(ser, 1), column_order = get_order(ser, 2),
+  row_title = "cells", column_title = "genes", use_raster = TRUE,
+  show_row_names = FALSE, show_column_names = FALSE, cluster_rows = FALSE, cluster_columns = FALSE, show_heatmap_legend = FALSE,
+  right_annotation = HeatmapAnnotation(inside = as.factor(bic_cells[csub]), which = "row", col = list(inside = mycolours), show_legend = FALSE),
+  top_annotation   = HeatmapAnnotation(inside = as.factor(bic_genes),    which = "column", col = list(inside = mycolours), show_legend = FALSE)
+)
+```
+
+We see in @fig-component1-heatmap that the matrix factorization has indeed identified a coherent block in the adjacency matrix. In other words, we identified a set of cells that co-expresses many different genes. The entire procedure was unsupervised. At no point did we have to use potential prior knowledge about cells or genes other than the expression data predicted from lemur.
+
+We can now revisit @fig-lemur-umap-celltypes and compare it with our bicluster. We can notice two things about its location on the UMAP.
+
+1. The bicluster forms a connected region. Thus, cells belonging to the bicluster are similar in their overall expression profile. Note that this does not necessarily have to hold. A bicluster could also be disconnected, as the a bicluster indicates a shared subset of the gene expression profile only.
+2. The cell type composition is not homogenous. The bicluster contains different cell types.
+
+```{r}
+#| label: fig-bicluster-and-celltypes
+#| layout-ncol: 2
+#| fig-width: 5
+#| fig-height: 5
+#| fig-cap: ""
+
+ord <- order(bic_cells)
+gglem <- as_tibble(colData(sce)) |>
+  mutate(
+    umap = lemur_umap,
+    bic = bic_cells) |>
+  arrange(bic) |>    
+  ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
+
+#gglem + geom_point(aes(colour = cell), size = 0.3) 
+gglem + geom_point(aes(colour = bic), size = 0.3) + scale_colour_discrete(palette = mycolours)
+```
+
+
+
+```{r}
+#| label: fig-table-celltype-bic
+#| fig-width: 5
+#| fig-height: 5.5
+#| fig-cap: "Cell type annotations versus membership in bicluster `j`. How would you biologically interpret this bicluster?"
+mosaicplot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells), 
+           main = "", las = 2, color =  c("#0057B7", "#FFD700"))
+```
+
+To close this section, let us briefly dive more into this last point. The exact cell type composition of the bicluster can be seen in @fig-table-celltype-bic. Indeed, this bicluster consists mostly of three to four different cell types. This highlights one of the key advantages of the label-free differential expression analysis as performed by lemur. The subsequent biclustering allowerd us to identify a coherent gene programmes as a response to the condition contrast. This programme is found to be relevant in a connected subset of cells encompassing different cell types. Thus, we do not only find subpopulations in a given cell type with a unique response. We even find subpopulations of other cell types that share _the same_ response programme!
 
 
 # Outlook
@@ -859,7 +801,13 @@ print(p_spectrum)
 
 For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether technical/practical or conceptual, please post to the [Bioconductor forum](https://support.bioconductor.org/) using the `lemur` tag and follow the [posting guide]( https://bioconductor.org/help/support/posting-guide/).
 
+`lemur` provides a label-free differential expression prediction at true single cell resolution. In its current form, `lemur` can automatically infer neighborhoods (i.e. subsets) of cells that show a consistent differential expression pattern. These neighborhoods can span multiple cell types, and are more generally complementary to other types of meta data. The combination of neighborhoods, as well as a detailed analysis of their composition allows to easily identify response patterns that are otherwise easier to miss in traditional pseudobulk analysis.
+
+A dedicated package for biclustering of the predicted differential expression is expected to be released soon. This allows to find not subsets of differential expression for the individual genes, but rather subsets of genes that show coherent up- or downregulation in a subset of cells. Thus, it will be possible to identify coherent gene response programmes and which cells are using them in an unsupervised manner. Just as for the individual gene neighborhoods, these biclusters are agnostic to cell types and other labels and, by design, allow to find response patterns independent of meta data labels that later can help in guiding biological interpretation.
+
 # Appendix: Variations and extensions to the workflow {#sec-appendix}
+
+In this appendix we collect some additional information, challenges and thoughts that are related to topics discussed in the main part, but somewhat tangential to the main narrative.
 
 ## Preprocessing
 
@@ -1063,9 +1011,6 @@ as_tibble(colData(sce)) |>
     coord_fixed()
 ```
 
-::: {.callout-note}
-## Challenge: How much do the results change if you change the default parameters in Harmony?
-:::
 
 ::: {.callout-note collapse="true"}
 ## Challenge: How do you do integration in Seurat?
@@ -1090,7 +1035,98 @@ Seurat::DimPlot(seur_obj2, reduction = "umap", group.by = "stim")
 ```
 :::
 
+## Adjacency matrix
 
+::: {.callout-note collapse="true"}
+## Challenge: Plotting the adjacency matrix
+
+Plot  `adj_jn`, i.e., the matrix spanned by the `j`-th NMF components `adjnmf$h[j, ]` and `adjnmf$w[, j])`, as a heatmap similar to @fig-adj-heatmap.
+```{r}
+#| label: fig-adj-jn
+#| fig-width: 5
+#| fig-height: 7
+#| out-width: "50%"
+#| fig-cap: "The matrix approximation from the j-th NMF component"
+Heatmap(adj_jn[csub, ][order(adjnmf$w[csub, j]), order(adjnmf$h[j, ])], 
+  name = "adj", col = colorRamp2(c(0, 1), c("#ffffff", "RoyalBlue")),
+  row_title = "cells", column_title = "genes", use_raster = TRUE,
+  show_row_names = FALSE, show_column_names = FALSE, cluster_rows = FALSE, cluster_columns = FALSE
+)
+```
+
+Note that here we use a [sequential colour map rather than a diverging](https://www.huber.embl.de/msmb/03-chap.html#sec-graphics-color) one, since the values are all positive.
+To order the rows and columns in this plot, we use the size of the NMF coefficients `w` and `h`. This is unlike in @fig-adj-heatmap, where we used, in lack of better alternatives, a dendrogram ordering^[See, e.g., <https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html> Section 2.3.4.]. 
+
+Similar plots can easily be produced for other values of `j`.
+:::
+
+
+## Bicluster coverage
+
+::: {.callout-note collapse="true"}
+## Challenge: Looking at the coverage of the biclusters
+Create a plot like @fig-adj-jn for the linear combination of all `r length(adjnmf$d)` factors, i.e.,
+visualize the low-rank (`k=``r length(adjnmf$d)`) approximation and compare it to @fig-adj-heatmap.
+
+```{r}
+#| label: morenmf
+#| message: false
+dichotomise <- function(x) {
+  # `cluster` is either 1 or 2, `centers` are the coordinates of the cluster centers, the `sign` function returns values 
+  # of -1 or +1 depending on the relative position of the centers along the real axis. The expression below gives
+  # `TRUE` if a point is in the cluster with the larger center, `FALSE` otherwise.
+  with(kmeans(as.vector(x), centers = 2), 3 + sign(as.vector(diff(centers))) == 2 * cluster)
+}
+
+wd <- apply(adjnmf$w, 2, dichotomise)
+hd <- apply(adjnmf$h, 1, dichotomise) |> t()
+
+# We use this for visualization below.
+adjappr     <- wd %*% hd
+
+# We use this for seriation below. BEA_TSP seems to be sensitive to the absolute scale of the data (?), hence, the division of the geometric mean of d. 
+adjappr4ser <- wd %*% diag(adjnmf$d) %*% hd  / exp(mean(log(adjnmf$d))) 
+
+# Subsampling for visualisation
+csub        <- sample(nrow(adj), 2048)
+adjs        <- abs(adj[csub, ])
+adjapprs    <- adjappr[csub, ]
+adjappr4ser <- adjappr4ser[csub, ]
+```
+```{r}
+#| label: fig-morenmf
+#| fig-width: 5
+#| fig-height: 7
+#| layout-ncol: 2
+#| outwidth: "100%"
+#| message: false
+ser <- seriate(adjappr4ser, method = "BEA_TSP")
+myhm <- function(x, name = deparse(substitute(x)), col = colorRamp2(range(x), c("#ffffff", "RoyalBlue"))) {
+  Heatmap(x, name = name, col = col, row_title = "cells", column_title = "genes", 
+      row_order = get_order(ser, 1), column_order = get_order(ser, 2),
+      show_row_names = FALSE, show_column_names = FALSE, use_raster = TRUE)
+}
+myhm(adjs)
+myhm(adjapprs)
+```
+Note how some biclusters are overlapping, as indicated by elements of `adjappr` having values above 1:
+```{r}
+#| label: nonoverlap
+table(adjappr)
+```
+```{r}
+#| label: fig-biclustersseparately
+#| fig-width: 4
+#| fig-height: 6
+#| layout-ncol: 4
+#| outwidth: "100%"
+#| message: false
+for (j in seq_len(ncol(wd)))
+  print(myhm(wd[csub, j, drop = FALSE]  %*% hd[j, , drop = FALSE], 
+             name = sprintf("j=%d", j),
+             col = colorRamp2(c(0, 1), c("#d0d0d0", "RoyalBlue"))))
+```
+:::
 
 
 # Session Info
