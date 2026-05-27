@@ -256,7 +256,6 @@ fit <- test_de(fit, contrast = cond(stim = "stim") - cond(stim = "ctrl"))
 
 We can now pick an individual gene (_PLSCR1_) and plot the predicted log fold change for each cell to show how it varies as a function of the underlying gene expression values (@fig-lemur_plot_de-1). The code below defines a helper function `mysequentialcolourscale` to get a suitable colour scale: white corresponds to zero and blue to `maxval`.
 
-
 ```{r}
 #| label: fig-lemur_plot_de-1
 #| message: false
@@ -270,6 +269,8 @@ mysequentialcolourscale <- function(maxval)
      palette = grDevices::colorRampPalette(RColorBrewer::brewer.pal(9, "Blues"))(256)
    )
 
+darkerbackground <- theme(panel.background = element_rect(fill = "#c0c0c0"))
+
 ggplscr1 <- as_tibble(colData(sce)) |>
   mutate(
     umap = lemur_umap,
@@ -279,7 +280,7 @@ ggplscr1 <- as_tibble(colData(sce)) |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
   
  ggplscr1 + geom_point(aes(colour = expr), size = 0.2) + mysequentialcolourscale(4) +
-    facet_wrap(vars(stim))
+    facet_wrap(vars(stim)) + darkerbackground
 ```
 
 We set up another colour scale for showing log fold changes, with blue corresponding to `-maxval`, red to `+maxval` and an extended range of white in the middle (around 0).
@@ -297,7 +298,7 @@ mydivergentcolourscale <- function(maxval)
      palette = grDevices::colorRampPalette(RColorBrewer::brewer.pal(11, "RdBu")[rev(c(1:5, 6, 6, 6, 6, 7:11))])(256)
    )
 
-ggplscr1 + geom_point(aes(colour = de), size = 0.2) + mydivergentcolourscale(1.5)   
+ggplscr1 + geom_point(aes(colour = de), size = 0.2) + mydivergentcolourscale(1.5) + darkerbackground 
 ```
 
 ## Find neighbourhoods (Step 3) and test for differential expression (Step 4)
@@ -333,7 +334,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(colour = de), size = 0.3) +
     mydivergentcolourscale(1) +
-    coord_fixed() +
+    coord_fixed() + darkerbackground +
     labs(title = paste("The top differentially expressed gene by did_pval:", top_did_gene$name))
 ```
 
@@ -383,7 +384,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(colour = de), size = 0.3) +
     mydivergentcolourscale(1) +
-    coord_fixed() +
+    coord_fixed() + darkerbackground +
     labs(title = paste("The top differentially expressed gene by did_pval:", top_did_gene$name)) +
     facet_wrap(vars(inside), labeller = label_both)
 ```
@@ -408,7 +409,7 @@ as_tibble(colData(sce), rownames = "cell_name") |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
     geom_point(aes(colour = de), size = 0.3) +
     mydivergentcolourscale(2) +
-    coord_fixed() +
+    coord_fixed() + darkerbackground +
     facet_grid(vars(inside), vars(gene_name), labeller = label_both) +
     labs(title = "Top 3 DE genes by pval")
 ```
@@ -495,7 +496,7 @@ p_joined_neighborhood <- as_tibble(colData(sce), rownames = "cell_name") |>
   left_join(joined_inside_df, by = "cell_name") |>
   ggplot(aes(x = umap[, 1], y = umap[, 2])) +
   geom_point(aes(colour = inside), size = 0.3) +
-  scale_colour_manual(values = c(`FALSE` = "grey80", `TRUE` = "red")) +
+  scale_colour_manual(values = c(`FALSE` = "goldenrod", `TRUE` = "royalblue3")) +
   coord_fixed() +
   labs(title = "Joined neighborhood", colour = "Inside")
 
@@ -773,11 +774,9 @@ gglem <- as_tibble(colData(sce)) |>
   arrange(bic) |>    
   ggplot(aes(x = umap[, 1], y = umap[, 2])) + coord_fixed()
 
-#gglem + geom_point(aes(colour = cell), size = 0.3) 
-gglem + geom_point(aes(colour = bic), size = 0.3) + scale_colour_discrete(palette = mycolours)
+gglem + geom_point(aes(colour = bic), size = 0.3) +
+  scale_colour_discrete(palette = mycolours) + darkerbackground
 ```
-
-
 
 ```{r}
 #| label: fig-table-celltype-bic
@@ -788,7 +787,7 @@ mosaicplot(table(celltypeannotation = colData(sce)$cell, inbicluster = bic_cells
            main = "", las = 2, color =  c("#0057B7", "#FFD700"))
 ```
 
-To close this section, let us briefly dive more into this last point. The exact cell type composition of the bicluster can be seen in @fig-table-celltype-bic. Indeed, this bicluster consists mostly of three to four different cell types. This highlights one of the key advantages of the label-free differential expression analysis as performed by lemur. The subsequent biclustering allowerd us to identify a coherent gene programmes as a response to the condition contrast. This programme is found to be relevant in a connected subset of cells encompassing different cell types. Thus, we do not only find subpopulations in a given cell type with a unique response. We even find subpopulations of other cell types that share _the same_ response programme!
+To close this section, let us briefly dive more into this last point. The exact cell type composition of the bicluster can be seen in @fig-table-celltype-bic. Indeed, this bicluster consists mostly of three cell types, and not all of these, but just fractions. This highlights one of the key advantages of LEMUR. The subsequent biclustering lets us identify a coherent gene programmes as a response to the condition contrast. This programme is found to be relevant in a connected subset of cells encompassing different cell types. Thus, we do not only find subpopulations in a given cell type with a unique response. We even find subpopulations of other cell types that share _the same_ response programme!
 
 
 # Outlook
@@ -803,7 +802,7 @@ For more details, see @AhlmannEltze:NatGen:2025. For any questions, whether tech
 
 `lemur` provides a label-free differential expression prediction at true single cell resolution. In its current form, `lemur` can automatically infer neighborhoods (i.e. subsets) of cells that show a consistent differential expression pattern. These neighborhoods can span multiple cell types, and are more generally complementary to other types of meta data. The combination of neighborhoods, as well as a detailed analysis of their composition allows to easily identify response patterns that are otherwise easier to miss in traditional pseudobulk analysis.
 
-A dedicated package for biclustering of the predicted differential expression is expected to be released soon. This allows to find not subsets of differential expression for the individual genes, but rather subsets of genes that show coherent up- or downregulation in a subset of cells. Thus, it will be possible to identify coherent gene response programmes and which cells are using them in an unsupervised manner. Just as for the individual gene neighborhoods, these biclusters are agnostic to cell types and other labels and, by design, allow to find response patterns independent of meta data labels that later can help in guiding biological interpretation.
+We hope to release a dedicated package for biclustering of the predicted differential expression patterns. It will provide not just subsets of differentially expressing cells for individual genes, but rather subsets of genes that show coherent up- or downregulation in a subset of cells. Thus, it will be possible to identify coherent gene response programmes and which cells are using them in an unsupervised manner. Just as for the individual gene neighborhoods, these biclusters are agnostic to cell types and other labels and, by design, allow to find response patterns independent of meta data labels that later can help in guiding biological interpretation.
 
 # Appendix: Variations and extensions to the workflow {#sec-appendix}
 
@@ -829,9 +828,10 @@ Too many dimensions for PCA can also pose a problem. The objective of doing PCA 
 
 ```{r}
 #| label: glmGamPoi_de_test
+#| message: false
 psce <- glmGamPoi::pseudobulk(fit, group_by = vars(cell, ind, stim))
 # Filter out NAs
-psce <- psce[,! is.na(psce$cell)]
+psce <- psce[, !is.na(psce$cell)]
 glm_fit <- glmGamPoi::glm_gp(psce, design = ~ stim * cell)
 glm_de <- glmGamPoi::test_de(glm_fit, contrast = cond(stim = "stim", cell = "B cells") - cond(stim = "ctrl", cell = "B cells"))
 glm_de |>
@@ -847,6 +847,7 @@ We use the `pseudobulk` function from `glmGamPoi` to calculate the average expre
 
 ```{r, paged.print=FALSE}
 #| label: glmGamPoi_vs_lemur2
+#| message: false
 
 # You could choose any gene
 gene_oi <- "HERC5"
@@ -1128,11 +1129,8 @@ for (j in seq_len(ncol(wd)))
 ```
 :::
 
-
 # Session Info
-
 ```{r}
+#| label: sessioninfo
 sessionInfo()
 ```
-
-
